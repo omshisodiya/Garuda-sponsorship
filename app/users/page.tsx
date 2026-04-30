@@ -94,8 +94,11 @@ export default function UsersPage() {
     if (!res) { setCfError("Network error"); return }
     const data = await res.json()
     if (!res.ok) { setCfError(data.error ?? "Failed"); return }
+    // Optimistically insert the new user immediately from the response
+    if (data.user) setUsers(prev => [...prev, data.user])
     setCreated({ username: cfUser, password: cfPwd })
-    setCfName(""); setCfUser(""); setCfEmail(""); setCfPwd("")
+    setCfName(""); setCfUser(""); setCfEmail(""); setCfRole("team"); setCfPwd("")
+    // Background refresh to sync any server-side ordering
     loadUsers()
   }
 
@@ -139,9 +142,13 @@ export default function UsersPage() {
       setConfirm(null)
       return
     }
+    // Update the affected user in state directly from the response
+    const updated = await res.json().catch(() => null)
+    if (updated?.user) {
+      setUsers(prev => prev.map(u => u.id === updated.user.id ? updated.user : u))
+    }
     setConfirm(null)
     setResetPwd("")
-    loadUsers()
   }
 
   async function handleAccount(e: React.FormEvent) {

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Eye, EyeOff, ChevronRight, User, Lock } from "lucide-react"
 import Image from "next/image"
@@ -18,7 +17,7 @@ export default function LoginPage() {
   const [showPwd, setShowPwd]   = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState("")
-  const router = useRouter()
+
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -37,9 +36,9 @@ export default function LoginPage() {
       if (!res.ok) { setError(data.error ?? "Login failed"); return }
       const dest = ROLE_DEST[data.user.role] ?? "/team"
       if (data.force_reset) {
-        router.push(`/change-password?next=${encodeURIComponent(dest)}`)
+        window.location.href = `/change-password?next=${encodeURIComponent(dest)}`
       } else {
-        router.push(dest)
+        window.location.href = dest
       }
     } catch {
       setError("Network error — please try again")

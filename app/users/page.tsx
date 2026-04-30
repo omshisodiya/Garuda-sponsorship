@@ -78,9 +78,13 @@ export default function UsersPage() {
   useEffect(() => {
     loadUsers()
     fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(d => { if (d?.user) { setMyRole(d.user.role); setMyId(d.user.id) } })
+    // Refresh when tab regains focus so cross-session changes appear
+    const onFocus = () => loadUsers()
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
   }, [loadUsers])
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setCfError("")
     if (!cfName || !cfUser || !cfEmail || !cfPwd) { setCfError("All fields required"); return }
@@ -151,7 +155,7 @@ export default function UsersPage() {
     setResetPwd("")
   }
 
-  async function handleAccount(e: React.FormEvent) {
+  async function handleAccount(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setAcBusy(true); setAcMsg(""); setAcSuccess("")
     const updates: Record<string, string> = {}

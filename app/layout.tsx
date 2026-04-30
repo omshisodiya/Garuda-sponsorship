@@ -75,8 +75,8 @@ const SIDEBAR_FULL = 252
 const SIDEBAR_ICON = 66
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const [role, setRole]         = useState("team")
-  const [user, setUser]         = useState("User")
+  const [role, setRole]         = useState(() => (typeof window !== "undefined" ? sessionStorage.getItem("g_role") ?? "team" : "team"))
+  const [user, setUser]         = useState(() => (typeof window !== "undefined" ? sessionStorage.getItem("g_name") ?? "User" : "User"))
   const [expanded, setExpanded] = useState(true)
   const [cmdOpen, setCmdOpen]   = useState(false)
   const [cmdQuery, setCmdQuery] = useState("")
@@ -97,6 +97,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         if (data?.user) {
           setRole(data.user.role)
           setUser(data.user.name)
+          sessionStorage.setItem("g_role", data.user.role)
+          sessionStorage.setItem("g_name", data.user.name)
         }
       })
       .catch(() => {})
@@ -130,7 +132,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   function navigate(href: string) { setCmdOpen(false); router.push(href) }
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
-    router.push("/login")
+    sessionStorage.removeItem("g_role")
+    sessionStorage.removeItem("g_name")
+    window.location.href = "/login"
   }
 
   const nav = NAV[role] || NAV.team

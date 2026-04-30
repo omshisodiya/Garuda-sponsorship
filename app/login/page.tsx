@@ -35,6 +35,9 @@ export default function LoginPage() {
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? "Login failed"); return }
       const dest = ROLE_DEST[data.user.role] ?? "/team"
+      // Cache role/name so layout renders instantly without waiting for /api/auth/me
+      sessionStorage.setItem("g_role", data.user.role)
+      sessionStorage.setItem("g_name", data.user.name)
       if (data.force_reset) {
         window.location.href = `/change-password?next=${encodeURIComponent(dest)}`
       } else {

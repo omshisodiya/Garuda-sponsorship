@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const all = getAllUsers()
+  const all = await getAllUsers()
   const visible = session.role === "superadmin"
     ? all
     : all.filter(u => u.role !== "superadmin")
@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "username, name, email, role, password required" }, { status: 400 })
   }
 
-  // Admins cannot create superadmins
   if (session.role === "admin" && role === "superadmin") {
     return NextResponse.json({ error: "Admins cannot create superadmin accounts" }, { status: 403 })
   }
@@ -44,8 +43,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const user = createUser({ username, name, email, role, password, created_by: session.sub })
-    addAudit({
+    const user = await createUser({ username, name, email, role, password, created_by: session.sub })
+    await addAudit({
       actor_id:   session.sub,
       actor_name: session.name,
       action:     "user_created",

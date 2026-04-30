@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  const user = getUserById(session.sub)
+  const user = await getUserById(session.sub)
   if (!user || user.status === "disabled") {
     return NextResponse.json({ error: "User not found or disabled" }, { status: 401 })
   }

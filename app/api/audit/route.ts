@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   if (session.role === "team") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  const url = new URL(req.url)
+  const url   = new URL(req.url)
   const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "20", 10), 100)
-  return NextResponse.json({ entries: getAudit(limit) })
+  return NextResponse.json({ entries: await getAudit(limit) })
 }

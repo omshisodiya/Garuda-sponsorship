@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Username and password required" }, { status: 400 })
   }
 
-  const user = getUserByUsername(username)
+  const user = await getUserByUsername(username)
   if (!user || !verifyPassword(password, user.password_hash)) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
   }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     role:     user.role,
   })
 
-  addAudit({
+  await addAudit({
     actor_id:   user.id,
     actor_name: user.name,
     action:     "login",

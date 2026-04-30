@@ -1,3 +1,4 @@
+import { db } from "./db"
 import { hashPassword } from "./auth"
 
 export type UserRole   = "superadmin" | "admin" | "team"
@@ -26,229 +27,287 @@ export type AuditEntry = {
   ts:         string
 }
 
-// ── Seed data — hashed at module load time ──────────────────────────────────
-// Superadmin: Om / 9999 (no force_reset)
-// All others: default password 1234, force_reset: true
-const SEED: Omit<User, "password_hash">[] = [
-  // ── Superadmin ──────────────────────────────────────────────────────────
-  { id: "u1",  username: "Om_9999",         name: "Om Shisodiya",            email: "omshisodiya2603@gmail.com",           role: "superadmin", status: "active", created_by: null, created_at: "2026-01-01T00:00:00Z", force_reset: false },
-  // ── Admin — Executive Committee ─────────────────────────────────────────
-  { id: "u2",  username: "Vatsal_VC",        name: "Vatsal Sharma",           email: "vatsal.2427030235@muj.manipal.edu",   role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u3",  username: "Kushagrah_GS",     name: "Kushagrah Singh",         email: "kushagrah.2430010462@muj.manipal.edu",role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u4",  username: "Harshvardhan_OD",  name: "Harshvardhan Singh",      email: "harsh.2428020040@muj.manipal.edu",    role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u5",  username: "Ridhi_OD",         name: "Ridhi Sharma",            email: "ridhi.2425060051@muj.manipal.edu",    role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u6",  username: "Rashiv_CD",        name: "Rashiv Saran",            email: "rashiv.2430010518@muj.manipal.edu",   role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u7",  username: "Reet_CS",          name: "Reet Rahul Bhanushali",   email: "reet.2427010105@muj.manipal.edu",     role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u8",  username: "Inesh_TS",         name: "Inesh Goyal",             email: "Inesh.2427010416@muj.manipal.edu",    role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u9",  username: "Anvi_T",           name: "Anvi Singla",             email: "anvi.2427030713@muj.manipal.edu",     role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u10", username: "Vansh_CO",         name: "Vansh Nandan",            email: "vansh.2428010080@muj.manipal.edu",    role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u11", username: "Lakshya_DE",       name: "Lakshya Thakur",          email: "lakshay.2430010416@muj.manipal.edu",  role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u12", username: "Shambhavi_DFnR",   name: "Shambhavi Singh",         email: "shambhavi.2430030177@muj.manipal.edu",role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u13", username: "Arpit_DPR",        name: "Arpit Srivastava",        email: "arpit.2425060004@muj.manipal.edu",    role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u14", username: "Kunj_DSM",         name: "Kunj Kumar",              email: "Kunj.2427010097@muj.manipal.edu",     role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u15", username: "Shaurya_EIC",      name: "Shaurya Sharma",          email: "shaurya.2427010162@muj.manipal.edu",  role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u16", username: "Ujjawal_TD",       name: "Ujjawal Chaudhary",       email: "Ujjawal.2427010084@muj.manipal.edu",  role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Admin — Executive Associates ────────────────────────────────────────
-  { id: "u17", username: "Vedhitha_EA",      name: "Vedhitha Hariharan Iyer", email: "vedhitha.2503030030@muj.manipal.edu", role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u18", username: "Aneek_EA",         name: "Aneek Dutta",             email: "aneek.2502052532@muj.manipal.edu",    role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u19", username: "Sairam_EA",        name: "Sai Ram Kathik Varma",    email: "saripalli.2503130056@muj.manipal.edu",role: "admin", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Operations ───────────────────────────────────────────────────
-  { id: "u20", username: "Piyush_HO",        name: "Piyush Khaitan",          email: "piyush.2502052880@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u21", username: "Palak_JHO",        name: "Palak Gupta",             email: "palak.2502052086@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u22", username: "Ritwika_JHO",      name: "Ritwika Verma",           email: "ritwika.2503120029@muj.manipal.edu",  role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u23", username: "Risham_OT",        name: "Risham Kumar",            email: "risham.2502050964@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u24", username: "Kushagra_OT",      name: "Kushagra Sharma",         email: "kushagra.2502052307@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u25", username: "Eshaan_OT",        name: "Eshaan Sharma",           email: "eshaan.2503090045@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u26", username: "Adarsh_OT",        name: "Adarsh Kumar",            email: "adarsh.2502050073@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u27", username: "Manit_OT",         name: "Manit Garg",              email: "manit.2503070025@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u28", username: "Aman_OT",          name: "Aman Kumar Tiwari",       email: "aman.2502051471@muj.manipal.edu",     role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Events ───────────────────────────────────────────────────────
-  { id: "u29", username: "NV_HE",            name: "N.V. Vitul",              email: "n.2502051285@muj.manipal.edu",         role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u30", username: "Angel_JHE",        name: "Angel",                   email: "angel.2502050547@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u31", username: "Bhavya_JHE",       name: "Bhavya Shukla",           email: "bhavya.2502052421@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u32", username: "Aaradhya_ET",      name: "Aaradhya Sharma",         email: "aaradhya.2502052882@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u33", username: "Yogit_ET",         name: "Yogit",                   email: "Yogit.2507020078@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u34", username: "BhavyaG_ET",       name: "Bhavya Gupta",            email: "bhavya.2502050027@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u35", username: "Sagnik_ET",        name: "Sagnik Kumar Dey",        email: "sagnik.2502051989@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Logistics ────────────────────────────────────────────────────
-  { id: "u36", username: "Arya_HL",          name: "Arya Paida",              email: "arya.2502052138@muj.manipal.edu",     role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u37", username: "Tanmay_JHL",       name: "Tanmay Kukreja",          email: "tanmay.2507010112@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u38", username: "Atharva_JHL",      name: "Atharva Srivastava",      email: "atharva.2502051171@muj.manipal.edu",  role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Marketing ────────────────────────────────────────────────────
-  { id: "u39", username: "Anshika_MT",       name: "Anshika Agarwal",         email: "anshika.2503120016@muj.manipal.edu",  role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u40", username: "Krati_MT",         name: "Krati Arora",             email: "krati.2505060026@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u41", username: "Pragya_MT",        name: "Pragya Sinha",            email: "pragya.2503030071@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u42", username: "Dhruv_MT",         name: "Dhruv Talwar",            email: "dhruv.2502050098@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u43", username: "Kanishka_MT",      name: "Kanishka",                email: "Kanishka.2502050297@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u44", username: "Samridhi_MT",      name: "Samridhi Choraria",       email: "samridhi.2503120054@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u45", username: "Presha_MT",        name: "Presha Gusain",           email: "presha.2503020049@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u46", username: "Aradhya_MT",       name: "Aradhya",                 email: "aradhya.2502051816@muj.manipal.edu",  role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Technical ────────────────────────────────────────────────────
-  { id: "u47", username: "Prisha_TT",        name: "Prisha Mittal",           email: "prisha.2502052597@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u48", username: "Devanshu_TT",      name: "Devanshu Yadav",          email: "devanshu.2502051088@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u49", username: "Bhumi_TT",         name: "Bhumi Shrivastav",        email: "Bhumi.2502052497@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Editorial ────────────────────────────────────────────────────
-  { id: "u50", username: "Sharanya_EDT",     name: "Sharanya Shetty",         email: "sharanya.2502051901@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u51", username: "Mayank_EDT",       name: "Mayank Singh",            email: "mayank.2506030032@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — FnR (Finance & Resources) ────────────────────────────────────
-  { id: "u52", username: "Akula_HFnR",       name: "Akula Shashank",          email: "akula.2502052468@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u53", username: "Aayush_JHFnR",     name: "Aayush Thakur",           email: "aayush.2506010188@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u54", username: "Swwastik_JHFnR",   name: "Swwastik Jain",           email: "swwastik.2503120082@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Social Media ─────────────────────────────────────────────────
-  { id: "u55", username: "Jivaansh_HS",      name: "Jivaansh Chandna",        email: "jivaansh.2502051716@muj.manipal.edu", role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u56", username: "Rashi_SMT",        name: "Rashi Singh",             email: "rashi.2504010040@muj.manipal.edu",    role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u57", username: "Gaadha_SMT",       name: "Gaadha Amal Nair",        email: "gaadha.2503030046@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u58", username: "Shubham_SMT",      name: "Shubham Jain",            email: "shubham.2502051213@muj.manipal.edu",  role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u59", username: "Sarika_SMT",       name: "Sarika Kashyap",          email: "sarika.2506020042@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  // ── Team — Graphic Design ───────────────────────────────────────────────
-  { id: "u60", username: "Anvi_GDT",         name: "Anvi Jindal",             email: "anvi.2502050984@muj.manipal.edu",     role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u61", username: "Tavishii_GDT",     name: "Tavishii",                email: "tavishi.2502050570@muj.manipal.edu",  role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-  { id: "u62", username: "Shivam_GDT",       name: "Shivam Kumar",            email: "shivam.2503030079@muj.manipal.edu",   role: "team", status: "active", created_by: "u1", created_at: "2026-01-01T00:00:00Z", force_reset: true },
-]
-
-const SEED_PASSWORDS: Record<string, string> = {
-  u1: "9999",
-  u2: "1234", u3: "1234", u4: "1234", u5: "1234", u6: "1234",
-  u7: "1234", u8: "1234", u9: "1234", u10: "1234", u11: "1234",
-  u12: "1234", u13: "1234", u14: "1234", u15: "1234", u16: "1234",
-  u17: "1234", u18: "1234", u19: "1234", u20: "1234", u21: "1234",
-  u22: "1234", u23: "1234", u24: "1234", u25: "1234", u26: "1234",
-  u27: "1234", u28: "1234", u29: "1234", u30: "1234", u31: "1234",
-  u32: "1234", u33: "1234", u34: "1234", u35: "1234", u36: "1234",
-  u37: "1234", u38: "1234", u39: "1234", u40: "1234", u41: "1234",
-  u42: "1234", u43: "1234", u44: "1234", u45: "1234", u46: "1234",
-  u47: "1234", u48: "1234", u49: "1234", u50: "1234", u51: "1234",
-  u52: "1234", u53: "1234", u54: "1234", u55: "1234", u56: "1234",
-  u57: "1234", u58: "1234", u59: "1234", u60: "1234", u61: "1234",
-  u62: "1234",
+// ── DB init (idempotent — runs CREATE TABLE IF NOT EXISTS on every cold start) ──
+let initPromise: Promise<void> | null = null
+function ensureInit(): Promise<void> {
+  if (!initPromise) initPromise = _init()
+  return initPromise
 }
 
-function buildStore(): Map<string, User> {
-  const m = new Map<string, User>()
-  for (const s of SEED) {
-    m.set(s.id, { ...s, password_hash: hashPassword(SEED_PASSWORDS[s.id] ?? "changeme") })
+async function _init(): Promise<void> {
+  const sql = db()
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS garuda_users (
+      id            TEXT PRIMARY KEY,
+      username      TEXT UNIQUE NOT NULL,
+      name          TEXT NOT NULL,
+      email         TEXT NOT NULL,
+      role          TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'active',
+      password_hash TEXT NOT NULL,
+      created_by    TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      force_reset   BOOLEAN NOT NULL DEFAULT TRUE
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS garuda_audit (
+      id         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+      actor_id   TEXT NOT NULL,
+      actor_name TEXT NOT NULL,
+      action     TEXT NOT NULL,
+      target_id  TEXT,
+      detail     TEXT NOT NULL,
+      ts         TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `
+
+  const [row] = await sql`SELECT COUNT(*)::int AS count FROM garuda_users`
+  if ((row as { count: number }).count === 0) {
+    await _seed(sql)
   }
-  return m
 }
 
-// Module-level singleton (persists across hot-reloads in dev via globalThis)
-declare global {
-  // eslint-disable-next-line no-var
-  var __garuda_users: Map<string, User> | undefined
-  // eslint-disable-next-line no-var
-  var __garuda_audit: AuditEntry[]     | undefined
-}
+// ── Seed (runs once when garuda_users is empty) ──────────────────────────────
+async function _seed(sql: ReturnType<typeof db>): Promise<void> {
+  const CREATED_AT = "2026-01-01T00:00:00.000Z"
+  const P_SUPER    = hashPassword("9999")
+  const P_DEFAULT  = hashPassword("1234")
 
-const USERS: Map<string, User> = globalThis.__garuda_users ?? buildStore()
-const AUDIT: AuditEntry[]      = globalThis.__garuda_audit  ?? []
-globalThis.__garuda_users = USERS
-globalThis.__garuda_audit = AUDIT
-
-let _uidCounter = USERS.size + 1
-function newId() { return `u${++_uidCounter}` }
-function nowISO() { return new Date().toISOString() }
-
-// ── Read ─────────────────────────────────────────────────────────────────────
-export function getUserById(id: string): User | null {
-  return USERS.get(id) ?? null
-}
-
-export function getUserByUsername(username: string): User | null {
-  for (const u of USERS.values()) {
-    if (u.username.toLowerCase() === username.toLowerCase()) return u
+  type SeedUser = {
+    id: string; username: string; name: string; email: string
+    role: string; created_by: string | null; password_hash: string; force_reset: boolean
   }
-  return null
+
+  const members: SeedUser[] = [
+    // ── Superadmin ─────────────────────────────────────────────────────────
+    { id:"u1",  username:"Om_9999",         name:"Om Shisodiya",            email:"omshisodiya2603@gmail.com",            role:"superadmin", created_by:null,  password_hash:P_SUPER,   force_reset:false },
+    // ── Admin — Executive Committee ────────────────────────────────────────
+    { id:"u2",  username:"vatsal_vc",        name:"Vatsal Sharma",           email:"vatsal.2427030235@muj.manipal.edu",    role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u3",  username:"kushagrah_gs",     name:"Kushagrah Singh",         email:"kushagrah.2430010462@muj.manipal.edu", role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u4",  username:"harshvardhan_od",  name:"Harshvardhan Singh",      email:"harsh.2428020040@muj.manipal.edu",     role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u5",  username:"ridhi_od",         name:"Ridhi Sharma",            email:"ridhi.2425060051@muj.manipal.edu",     role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u6",  username:"rashiv_cd",        name:"Rashiv Saran",            email:"rashiv.2430010518@muj.manipal.edu",    role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u7",  username:"reet_cs",          name:"Reet Rahul Bhanushali",   email:"reet.2427010105@muj.manipal.edu",      role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u8",  username:"inesh_ts",         name:"Inesh Goyal",             email:"inesh.2427010416@muj.manipal.edu",     role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u9",  username:"anvi_t",           name:"Anvi Singla",             email:"anvi.2427030713@muj.manipal.edu",      role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Admin — Board of Directors ─────────────────────────────────────────
+    { id:"u10", username:"vansh_co",         name:"Vansh Nandan",            email:"vansh.2428010080@muj.manipal.edu",     role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u11", username:"lakshya_de",       name:"Lakshya Thakur",          email:"lakshay.2430010416@muj.manipal.edu",   role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u12", username:"shambhavi_dfnr",   name:"Shambhavi Singh",         email:"shambhavi.2430030177@muj.manipal.edu", role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u13", username:"arpit_dpr",        name:"Arpit Srivastava",        email:"arpit.2425060004@muj.manipal.edu",     role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u14", username:"kunj_dsm",         name:"Kunj Kumar",              email:"kunj.2427010097@muj.manipal.edu",      role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u15", username:"shaurya_eic",      name:"Shaurya Sharma",          email:"shaurya.2427010162@muj.manipal.edu",   role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u16", username:"ujjawal_td",       name:"Ujjawal Chaudhary",       email:"ujjawal.2427010084@muj.manipal.edu",   role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Admin — Executive Associates ───────────────────────────────────────
+    { id:"u17", username:"vedhitha_ea",      name:"Vedhitha Hariharan Iyer", email:"vedhitha.2503030030@muj.manipal.edu",  role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u18", username:"aneek_ea",         name:"Aneek Dutta",             email:"aneek.2502052532@muj.manipal.edu",     role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u19", username:"sairam_ea",        name:"Sai Ram Kathik Varma",    email:"saripalli.2503130056@muj.manipal.edu", role:"admin",      created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Operations ──────────────────────────────────────────────────
+    { id:"u20", username:"piyush_ho",        name:"Piyush Khaitan",          email:"piyush.2502052880@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u21", username:"palak_jho",        name:"Palak Gupta",             email:"palak.2502052086@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u22", username:"ritwika_jho",      name:"Ritwika Verma",           email:"ritwika.2503120029@muj.manipal.edu",   role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u23", username:"risham_ot",        name:"Risham Kumar",            email:"risham.2502050964@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u24", username:"kushagra_ot",      name:"Kushagra Sharma",         email:"kushagra.2502052307@muj.manipal.edu",  role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u25", username:"eshaan_ot",        name:"Eshaan Sharma",           email:"eshaan.2503090045@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u26", username:"adarsh_ot",        name:"Adarsh Kumar",            email:"adarsh.2502050073@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u27", username:"manit_ot",         name:"Manit Garg",              email:"manit.2503070025@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u28", username:"aman_ot",          name:"Aman Kumar Tiwari",       email:"aman.2502051471@muj.manipal.edu",      role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Events ──────────────────────────────────────────────────────
+    { id:"u29", username:"nv_he",            name:"N.V. Vitul",              email:"n.2502051285@muj.manipal.edu",          role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u30", username:"angel_jhe",        name:"Angel",                   email:"angel.2502050547@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u31", username:"bhavya_jhe",       name:"Bhavya Shukla",           email:"bhavya.2502052421@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u32", username:"aaradhya_et",      name:"Aaradhya Sharma",         email:"aaradhya.2502052882@muj.manipal.edu",  role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u33", username:"yogit_et",         name:"Yogit",                   email:"yogit.2507020078@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u34", username:"bhavyag_et",       name:"Bhavya Gupta",            email:"bhavya.2502050027@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u35", username:"sagnik_et",        name:"Sagnik Kumar Dey",        email:"sagnik.2502051989@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Logistics ───────────────────────────────────────────────────
+    { id:"u36", username:"arya_hl",          name:"Arya Paida",              email:"arya.2502052138@muj.manipal.edu",      role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u37", username:"tanmay_jhl",       name:"Tanmay Kukreja",          email:"tanmay.2507010112@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u38", username:"atharva_jhl",      name:"Atharva Srivastava",      email:"atharva.2502051171@muj.manipal.edu",   role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Marketing ───────────────────────────────────────────────────
+    { id:"u39", username:"anshika_mt",       name:"Anshika Agarwal",         email:"anshika.2503120016@muj.manipal.edu",   role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u40", username:"krati_mt",         name:"Krati Arora",             email:"krati.2505060026@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u41", username:"pragya_mt",        name:"Pragya Sinha",            email:"pragya.2503030071@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u42", username:"dhruv_mt",         name:"Dhruv Talwar",            email:"dhruv.2502050098@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u43", username:"kanishka_mt",      name:"Kanishka",                email:"kanishka.2502050297@muj.manipal.edu",  role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u44", username:"samridhi_mt",      name:"Samridhi Choraria",       email:"samridhi.2503120054@muj.manipal.edu",  role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u45", username:"presha_mt",        name:"Presha Gusain",           email:"presha.2503020049@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u46", username:"aradhya_mt",       name:"Aradhya",                 email:"aradhya.2502051816@muj.manipal.edu",   role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Technical ───────────────────────────────────────────────────
+    { id:"u47", username:"prisha_tt",        name:"Prisha Mittal",           email:"prisha.2502052597@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u48", username:"devanshu_tt",      name:"Devanshu Yadav",          email:"devanshu.2502051088@muj.manipal.edu",  role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u49", username:"bhumi_tt",         name:"Bhumi Shrivastav",        email:"bhumi.2502052497@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Editorial ───────────────────────────────────────────────────
+    { id:"u50", username:"sharanya_edt",     name:"Sharanya Shetty",         email:"sharanya.2502051901@muj.manipal.edu",  role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u51", username:"mayank_edt",       name:"Mayank Singh",            email:"mayank.2506030032@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Social Media ────────────────────────────────────────────────
+    { id:"u52", username:"rashi_smt",        name:"Rashi Singh",             email:"rashi.2504010040@muj.manipal.edu",     role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u53", username:"gaadha_smt",       name:"Gaadha Amal Nair",        email:"gaadha.2503030046@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u54", username:"shubham_smt",      name:"Shubham Jain",            email:"shubham.2502051213@muj.manipal.edu",   role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u55", username:"sarika_smt",       name:"Sarika Kashyap",          email:"sarika.2506020042@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    // ── Team — Graphic Design ──────────────────────────────────────────────
+    { id:"u56", username:"anvi_gdt",         name:"Anvi Jindal",             email:"anvi.2502050984@muj.manipal.edu",      role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u57", username:"tavishii_gdt",     name:"Tavishii",                email:"tavishi.2502050570@muj.manipal.edu",   role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+    { id:"u58", username:"shivam_gdt",       name:"Shivam Kumar",            email:"shivam.2503030079@muj.manipal.edu",    role:"team",       created_by:"u1",  password_hash:P_DEFAULT, force_reset:true  },
+  ]
+
+  for (const m of members) {
+    await sql`
+      INSERT INTO garuda_users
+        (id, username, name, email, role, status, password_hash, created_by, created_at, force_reset)
+      VALUES
+        (${m.id}, ${m.username}, ${m.name}, ${m.email}, ${m.role}, 'active',
+         ${m.password_hash}, ${m.created_by}, ${CREATED_AT}, ${m.force_reset})
+    `
+  }
 }
 
-export function getAllUsers(): User[] {
-  return [...USERS.values()].sort((a, b) => a.created_at.localeCompare(b.created_at))
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function rowToUser(row: Record<string, unknown>): User {
+  return {
+    id:            row.id            as string,
+    username:      row.username      as string,
+    name:          row.name          as string,
+    email:         row.email         as string,
+    role:          row.role          as UserRole,
+    status:        row.status        as UserStatus,
+    password_hash: row.password_hash as string,
+    created_by:    row.created_by    as string | null,
+    created_at:    String(row.created_at),
+    force_reset:   row.force_reset   as boolean,
+  }
+}
+
+// ── Read ──────────────────────────────────────────────────────────────────────
+export async function getUserById(id: string): Promise<User | null> {
+  await ensureInit()
+  const rows = await db()`SELECT * FROM garuda_users WHERE id = ${id}`
+  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+}
+
+export async function getUserByUsername(username: string): Promise<User | null> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT * FROM garuda_users WHERE lower(username) = lower(${username})
+  `
+  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  await ensureInit()
+  const rows = await db()`SELECT * FROM garuda_users ORDER BY created_at ASC`
+  return rows.map(r => rowToUser(r as Record<string, unknown>))
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
 export type CreateUserInput = {
-  username:    string
-  name:        string
-  email:       string
-  role:        UserRole
-  password:    string
-  created_by:  string
+  username:   string
+  name:       string
+  email:      string
+  role:       UserRole
+  password:   string
+  created_by: string
 }
 
-export function createUser(input: CreateUserInput): User {
-  if (getUserByUsername(input.username)) {
-    throw new Error(`Username "${input.username}" is already taken`)
-  }
-  const user: User = {
-    id:            newId(),
-    username:      input.username,
-    name:          input.name,
-    email:         input.email,
-    role:          input.role,
-    status:        "active",
-    password_hash: hashPassword(input.password),
-    created_by:    input.created_by,
-    created_at:    nowISO(),
-    force_reset:   true,
-  }
-  USERS.set(user.id, user)
-  return user
+export async function createUser(input: CreateUserInput): Promise<User> {
+  await ensureInit()
+  const existing = await getUserByUsername(input.username)
+  if (existing) throw new Error(`Username "${input.username}" is already taken`)
+
+  const id            = `u${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`
+  const password_hash = hashPassword(input.password)
+  const now           = new Date().toISOString()
+  const sql           = db()
+
+  const rows = await sql`
+    INSERT INTO garuda_users
+      (id, username, name, email, role, status, password_hash, created_by, created_at, force_reset)
+    VALUES
+      (${id}, ${input.username}, ${input.name}, ${input.email}, ${input.role},
+       'active', ${password_hash}, ${input.created_by}, ${now}, TRUE)
+    RETURNING *
+  `
+  return rowToUser(rows[0] as Record<string, unknown>)
 }
 
-export function updateUserStatus(id: string, status: UserStatus): User | null {
-  const u = USERS.get(id)
-  if (!u) return null
-  const updated = { ...u, status }
-  USERS.set(id, updated)
-  return updated
+export async function updateUserStatus(id: string, status: UserStatus): Promise<User | null> {
+  await ensureInit()
+  const rows = await db()`
+    UPDATE garuda_users SET status = ${status} WHERE id = ${id} RETURNING *
+  `
+  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
 }
 
-export function updateUserRole(id: string, role: UserRole): User | null {
-  const u = USERS.get(id)
-  if (!u) return null
-  const updated = { ...u, role }
-  USERS.set(id, updated)
-  return updated
+export async function updateUserRole(id: string, role: UserRole): Promise<User | null> {
+  await ensureInit()
+  const rows = await db()`
+    UPDATE garuda_users SET role = ${role} WHERE id = ${id} RETURNING *
+  `
+  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
 }
 
-export function resetPassword(id: string, newPassword: string): User | null {
-  const u = USERS.get(id)
-  if (!u) return null
-  const updated = { ...u, password_hash: hashPassword(newPassword), force_reset: true, status: "pending_reset" as UserStatus }
-  USERS.set(id, updated)
-  return updated
+export async function resetPassword(id: string, newPassword: string): Promise<User | null> {
+  await ensureInit()
+  const hash = hashPassword(newPassword)
+  const rows = await db()`
+    UPDATE garuda_users
+    SET password_hash = ${hash}, force_reset = TRUE, status = 'pending_reset'
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
 }
 
-export function changePassword(id: string, newPassword: string): User | null {
-  const u = USERS.get(id)
-  if (!u) return null
-  const updated = { ...u, password_hash: hashPassword(newPassword), force_reset: false, status: "active" as UserStatus }
-  USERS.set(id, updated)
-  return updated
+export async function changePassword(id: string, newPassword: string): Promise<User | null> {
+  await ensureInit()
+  const hash = hashPassword(newPassword)
+  const rows = await db()`
+    UPDATE garuda_users
+    SET password_hash = ${hash}, force_reset = FALSE, status = 'active'
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
 }
 
-export function deleteUser(id: string): boolean {
-  return USERS.delete(id)
+export async function deleteUser(id: string): Promise<boolean> {
+  await ensureInit()
+  const rows = await db()`DELETE FROM garuda_users WHERE id = ${id} RETURNING id`
+  return rows.length > 0
 }
 
-export function updateUsername(id: string, username: string): User | null {
-  const u = USERS.get(id)
-  if (!u) return null
-  const updated = { ...u, username }
-  USERS.set(id, updated)
-  return updated
+export async function updateUsername(id: string, username: string): Promise<User | null> {
+  await ensureInit()
+  const rows = await db()`
+    UPDATE garuda_users SET username = ${username} WHERE id = ${id} RETURNING *
+  `
+  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
 }
 
 // ── Audit ─────────────────────────────────────────────────────────────────────
-export function addAudit(entry: Omit<AuditEntry, "id" | "ts">) {
-  AUDIT.unshift({ ...entry, id: crypto.randomUUID(), ts: nowISO() })
-  if (AUDIT.length > 500) AUDIT.length = 500
+export async function addAudit(entry: Omit<AuditEntry, "id" | "ts">): Promise<void> {
+  await ensureInit()
+  await db()`
+    INSERT INTO garuda_audit (actor_id, actor_name, action, target_id, detail)
+    VALUES (${entry.actor_id}, ${entry.actor_name}, ${entry.action}, ${entry.target_id ?? null}, ${entry.detail})
+  `
 }
 
-export function getAudit(limit = 50): AuditEntry[] {
-  return AUDIT.slice(0, limit)
+export async function getAudit(limit = 50): Promise<AuditEntry[]> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT id, actor_id, actor_name, action, target_id, detail, ts::text AS ts
+    FROM garuda_audit
+    ORDER BY ts DESC
+    LIMIT ${limit}
+  `
+  return rows as unknown as AuditEntry[]
 }
 
-// ── Safe public shape (no password_hash) ─────────────────────────────────────
+// ── Public shape (no password_hash) ──────────────────────────────────────────
 export type PublicUser = Omit<User, "password_hash">
 export function toPublic(u: User): PublicUser {
   const { password_hash: _, ...rest } = u

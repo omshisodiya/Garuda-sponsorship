@@ -15,10 +15,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Password must be at least 4 characters" }, { status: 400 })
   }
 
-  const updated = changePassword(session.sub, body.password)
+  const updated = await changePassword(session.sub, body.password)
   if (!updated) return NextResponse.json({ error: "User not found" }, { status: 404 })
 
-  addAudit({
+  await addAudit({
     actor_id:   session.sub,
     actor_name: session.name,
     action:     "password_changed",

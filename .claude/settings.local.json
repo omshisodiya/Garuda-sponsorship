@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cmd /c \"dir /b C:\\\\Users\\\\omshi\\\\garuda-command-centre\\\\node_modules\\\\next 2>&1 | head -30\")"
+    ]
+  }
+}

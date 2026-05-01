@@ -509,7 +509,7 @@ export default function LeadsPage() {
                 ].map(f => (
                   <div key={f.key}>
                     <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>{f.label}{f.required && " *"}</label>
-                    <input className="g-input" value={(form as Record<string,string>)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder} />
+                    <input className="g-input" value={String((form as Record<string, unknown>)[f.key] ?? "")} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder} />
                   </div>
                 ))}
 

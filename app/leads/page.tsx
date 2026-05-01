@@ -8,8 +8,16 @@ import {
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
-  TEAM, CATEGORIES, MIN_SPONSORSHIP_AMOUNT, type Lead, type LeadStatus, type LeadStage, type Category,
+  TEAM, CATEGORIES, TIERS, type Lead, type LeadStatus, type LeadStage, type Category, type TeamMemberId,
 } from "../lib/data"
+
+const DEAL_OPTIONS = [
+  { label: "Partner Sponsor — ₹75,000",  value: 75000  },
+  { label: "Co Sponsor — ₹95,000",       value: 95000  },
+  { label: "Title Sponsor — ₹1,50,000",  value: 150000 },
+  { label: "In-kind (₹0)",               value: 0      },
+  { label: "Other (custom amount)",       value: -1     },
+]
 
 const STATUS_COLORS: Record<LeadStatus, string> = {
   not_started:  "badge-blue",
@@ -41,6 +49,69 @@ function getTeamColor(id: string | null) {
   return TEAM.find(m => m.id === id)?.color || "var(--text-3)"
 }
 
+function exportPerMember(leads: Lead[]) {
+  const wb = XLSX.utils.book_new()
+
+  // Summary sheet
+  const summaryRows = TEAM.filter(m => m.tier !== "superadmin").map(m => {
+    const myLeads = leads.filter(l => l.assigned_to === m.id)
+    const confirmed = myLeads.filter(l => l.status === "confirmed")
+    const contacted = myLeads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status))
+    return {
+      "Name":             m.name,
+      "Role":             m.role,
+      "Tier":             m.tier,
+      "Total Leads":      myLeads.length,
+      "Contacted":        contacted.length,
+      "In Discussion":    myLeads.filter(l => l.status === "in_discussion").length,
+      "Confirmed":        confirmed.length,
+      "Revenue Secured":  confirmed.reduce((s, l) => s + l.deal_value, 0),
+      "Pipeline Value":   myLeads.filter(l => !["rejected","confirmed"].includes(l.status))
+                                  .reduce((s, l) => s + (l.deal_value * l.probability / 100), 0),
+    }
+  })
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Team Summary")
+
+  // Per-member sheets (top 10 active members)
+  const activeMembers = TEAM.filter(m => m.tier !== "superadmin").filter(m => leads.some(l => l.assigned_to === m.id))
+  for (const m of activeMembers.slice(0, 10)) {
+    const myLeads = leads.filter(l => l.assigned_to === m.id).map(l => ({
+      "Company":        l.company,
+      "Contact":        l.poc_name,
+      "Email":          l.poc_email,
+      "Phone":          l.poc_phone,
+      "Category":       l.category,
+      "Status":         l.status.replace(/_/g, " "),
+      "Stage":          l.stage,
+      "Deal Value":     l.deal_value,
+      "Probability %":  l.probability,
+      "Last Activity":  l.last_activity,
+      "Notes":          l.notes,
+    }))
+    const sheetName = m.name.split(" ")[0].slice(0, 28)
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(myLeads), sheetName)
+  }
+
+  // All leads sheet
+  const allRows = leads.map(l => ({
+    "Company":      l.company,
+    "Contact":      l.poc_name,
+    "Email":        l.poc_email,
+    "Phone":        l.poc_phone,
+    "Category":     l.category,
+    "Status":       l.status.replace(/_/g, " "),
+    "Stage":        l.stage,
+    "Assigned To":  getTeamName(l.assigned_to),
+    "Deal Value":   l.deal_value,
+    "Probability %":l.probability,
+    "Last Activity":l.last_activity,
+    "Notes":        l.notes,
+  }))
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allRows), "All Leads")
+
+  XLSX.writeFile(wb, `Garuda_Sponsorship_Report_${new Date().toISOString().split("T")[0]}.xlsx`)
+}
+
 export default function LeadsPage() {
   const [leads, setLeads]           = useState<Lead[]>([])
   const [loading, setLoading]       = useState(true)
@@ -55,8 +126,14 @@ export default function LeadsPage() {
   const [addingLead, setAddingLead] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // new lead form
-  const [form, setForm] = useState({ company: "", poc_name: "", poc_email: "", poc_phone: "", category: "FMCG" as Category, deal_value: "", notes: "" })
+  // new lead form state
+  const [form, setForm] = useState({
+    company: "", poc_name: "", poc_email: "", poc_phone: "",
+    category: "FMCG" as Category,
+    deal_preset: 75000 as number,   // selected tier value (-1 = custom)
+    deal_custom: "",                // custom amount text
+    notes: "",
+  })
 
   useEffect(() => {
     fetch("/api/leads")
@@ -74,6 +151,11 @@ export default function LeadsPage() {
       return matchSearch && matchStatus && matchCat
     })
   }, [leads, search, statusFilter, categoryFilter])
+
+  function resolvedDealValue() {
+    if (form.deal_preset === -1) return parseInt(form.deal_custom) || 0
+    return form.deal_preset
+  }
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -93,7 +175,7 @@ export default function LeadsPage() {
           status:       "not_started" as LeadStatus,
           stage:        "prospect" as LeadStage,
           assigned_to:  null,
-          deal_value:   parseInt(r["Deal Value"] || r["Amount"] || String(MIN_SPONSORSHIP_AMOUNT)) || MIN_SPONSORSHIP_AMOUNT,
+          deal_value:   parseInt(r["Deal Value"] || r["Amount"] || "75000") || 75000,
           probability:  25,
           notes:        r["Notes"] || "",
           last_activity: today,
@@ -132,7 +214,7 @@ export default function LeadsPage() {
           company: form.company, poc_name: form.poc_name,
           poc_email: form.poc_email, poc_phone: form.poc_phone,
           category: form.category, status: "not_started", stage: "prospect",
-          assigned_to: null, deal_value: parseInt(form.deal_value) || MIN_SPONSORSHIP_AMOUNT,
+          assigned_to: null, deal_value: resolvedDealValue(),
           probability: 25, notes: form.notes,
           last_activity: today, created_by: "u1",
         }),
@@ -144,7 +226,7 @@ export default function LeadsPage() {
     } catch { /* silent */ } finally {
       setAddingLead(false)
     }
-    setForm({ company: "", poc_name: "", poc_email: "", poc_phone: "", category: "FMCG", deal_value: "", notes: "" })
+    setForm({ company: "", poc_name: "", poc_email: "", poc_phone: "", category: "FMCG", deal_preset: 75000, deal_custom: "", notes: "" })
     setShowAddForm(false)
   }
 
@@ -173,7 +255,7 @@ export default function LeadsPage() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn-ghost" onClick={() => setShowImport(true)} style={{ fontSize: 11 }}><Upload size={13} /> Import Excel</button>
-          <button className="btn-ghost" style={{ fontSize: 11 }}><Download size={13} /> Export</button>
+          <button className="btn-ghost" onClick={() => exportPerMember(leads)} style={{ fontSize: 11 }}><Download size={13} /> Export Report</button>
           <button className="btn-gold" onClick={() => setShowAddForm(true)} style={{ fontSize: 11 }}><Plus size={13} /> Add Lead</button>
         </div>
       </motion.div>
@@ -182,7 +264,6 @@ export default function LeadsPage() {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
 
-        {/* Search */}
         <div style={{ flex: 1, minWidth: 220, display: "flex", alignItems: "center", gap: 9, padding: "0 13px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)" }}>
           <Search size={14} color="var(--text-3)" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search sponsors, contacts…"
@@ -190,7 +271,6 @@ export default function LeadsPage() {
           {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", display: "flex" }}><X size={13} /></button>}
         </div>
 
-        {/* Status filter */}
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
           {ALL_STATUSES.map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
@@ -200,7 +280,6 @@ export default function LeadsPage() {
           ))}
         </div>
 
-        {/* Category filter */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <SlidersHorizontal size={12} color="var(--text-3)" />
           <select className="g-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value as Category | "All")}>
@@ -209,7 +288,6 @@ export default function LeadsPage() {
           </select>
         </div>
 
-        {/* View mode */}
         <div style={{ display: "flex", background: "rgba(0,0,0,0.25)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-sm)", overflow: "hidden" }}>
           {(["table","kanban"] as const).map(m => (
             <button key={m} onClick={() => setViewMode(m)}
@@ -260,7 +338,16 @@ export default function LeadsPage() {
                         </div>
                       ) : <span style={{ fontSize: 11, color: "var(--text-3)" }}>Unassigned</span>}
                     </td>
-                    <td style={{ fontSize: 12, fontWeight: 700, color: "#C9A24B" }}>₹{lead.deal_value.toLocaleString("en-IN")}</td>
+                    <td>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#C9A24B" }}>
+                          {lead.deal_value === 0 ? "In-kind" : `₹${lead.deal_value.toLocaleString("en-IN")}`}
+                        </div>
+                        <div style={{ fontSize: 9, color: "var(--text-3)" }}>
+                          {lead.deal_value >= 150000 ? "Title" : lead.deal_value >= 95000 ? "Co" : lead.deal_value >= 75000 ? "Partner" : lead.deal_value === 0 ? "" : "Custom"}
+                        </div>
+                      </div>
+                    </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <div style={{ width: 40, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
@@ -274,7 +361,7 @@ export default function LeadsPage() {
                         <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }} onClick={() => window.open(`mailto:${lead.poc_email}`)}>
                           <Mail size={11} />
                         </button>
-                        <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }}>
+                        <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }} onClick={() => setSelected(lead)}>
                           <ChevronRight size={11} />
                         </button>
                       </div>
@@ -310,7 +397,9 @@ export default function LeadsPage() {
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>{lead.company}</div>
                       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 8 }}>{lead.poc_name} · {lead.category}</div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#C9A24B" }}>₹{lead.deal_value.toLocaleString("en-IN")}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#C9A24B" }}>
+                          {lead.deal_value === 0 ? "In-kind" : `₹${lead.deal_value.toLocaleString("en-IN")}`}
+                        </span>
                         <span style={{ fontSize: 10, color: "var(--text-3)" }}>{lead.probability}%</span>
                       </div>
                     </motion.div>
@@ -346,7 +435,8 @@ export default function LeadsPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {[
-                  { label: "Deal Value",   value: `₹${selected.deal_value.toLocaleString("en-IN")}` },
+                  { label: "Deal Value",   value: selected.deal_value === 0 ? "In-kind" : `₹${selected.deal_value.toLocaleString("en-IN")}` },
+                  { label: "Tier",         value: selected.deal_value >= 150000 ? "Title Sponsor" : selected.deal_value >= 95000 ? "Co Sponsor" : selected.deal_value >= 75000 ? "Partner Sponsor" : selected.deal_value === 0 ? "In-kind" : "Custom" },
                   { label: "Probability",  value: `${selected.probability}%` },
                   { label: "Category",     value: selected.category },
                   { label: "Stage",        value: selected.stage },
@@ -412,17 +502,46 @@ export default function LeadsPage() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {[
-                  { label: "Company Name", key: "company", placeholder: "e.g. Red Bull India", required: true },
-                  { label: "POC Name",     key: "poc_name", placeholder: "e.g. Arjun Mehta", required: true },
-                  { label: "Email",        key: "poc_email", placeholder: "contact@company.com" },
-                  { label: "Phone",        key: "poc_phone", placeholder: "+91 XXXXX XXXXX" },
-                  { label: "Deal Value (₹)", key: "deal_value", placeholder: "e.g. 75000" },
+                  { label: "Company Name", key: "company",   placeholder: "e.g. Red Bull India", required: true },
+                  { label: "POC Name",     key: "poc_name",  placeholder: "e.g. Arjun Mehta",    required: true },
+                  { label: "Email",        key: "poc_email", placeholder: "contact@company.com"               },
+                  { label: "Phone",        key: "poc_phone", placeholder: "+91 XXXXX XXXXX"                   },
                 ].map(f => (
                   <div key={f.key}>
                     <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>{f.label}{f.required && " *"}</label>
                     <input className="g-input" value={(form as Record<string,string>)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder} />
                   </div>
                 ))}
+
+                {/* Deal Value Dropdown */}
+                <div>
+                  <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Deal Value / Tier</label>
+                  <select className="g-select" style={{ width: "100%" }} value={form.deal_preset}
+                    onChange={e => setForm(p => ({ ...p, deal_preset: parseInt(e.target.value) }))}>
+                    {DEAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Custom amount field (only when "Other" selected) */}
+                {form.deal_preset === -1 && (
+                  <div>
+                    <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Custom Amount (₹)</label>
+                    <input className="g-input" value={form.deal_custom} onChange={e => setForm(p => ({ ...p, deal_custom: e.target.value }))} placeholder="e.g. 120000" type="number" min="0" />
+                  </div>
+                )}
+
+                {/* Tier preview */}
+                {form.deal_preset !== -1 && (
+                  <div style={{ padding: "8px 12px", background: "rgba(201,162,75,0.06)", border: "1px solid rgba(201,162,75,0.15)", borderRadius: "var(--r-sm)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 10, color: "var(--text-3)" }}>
+                      {TIERS.find(t => t.price === form.deal_preset)?.name || (form.deal_preset === 0 ? "In-kind" : "Custom")}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#C9A24B" }}>
+                      {form.deal_preset === 0 ? "In-kind" : `₹${form.deal_preset.toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+                )}
+
                 <div>
                   <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Category</label>
                   <select className="g-select" style={{ width: "100%" }} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value as Category }))}>

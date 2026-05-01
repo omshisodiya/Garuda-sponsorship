@@ -176,7 +176,7 @@ export default function CopilotPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {!apiAvail && (
             <div style={{ fontSize: 11, color: "var(--warning)", background: "var(--warning-bg)", border: "1px solid var(--warning-edge)", borderRadius: "var(--r-sm)", padding: "5px 10px" }}>
-              Add NEXT_PUBLIC_GROQ_API_KEY to .env.local and restart dev server
+              AI service unavailable. Please check backend configuration.
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

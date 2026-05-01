@@ -246,14 +246,27 @@ function VerificationPanel({
     ? pending
     : pending.filter(c => c.user_role === "team")
 
-  if (visible.length === 0) return null
+  if (visible.length === 0) {
+    return (
+      <div style={{ padding: "44px 20px", textAlign: "center", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: "var(--r-md)" }}>
+        <ShieldCheck size={28} color="var(--text-3)" strokeWidth={1} style={{ margin: "0 auto 14px" }} />
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-2)", marginBottom: 8 }}>Queue is Clear</div>
+        <div style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.7, maxWidth: 360, margin: "0 auto" }}>
+          {currentUser?.role === "superadmin"
+            ? "When admins or team members mark a mission complete it will appear here for your approval."
+            : "When team members mark a mission complete it will appear here for your approval."}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      className="panel" style={{ marginBottom: 20, borderColor: "var(--warning-edge)", background: "var(--warning-bg)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <ShieldCheck size={14} color="var(--warning)" strokeWidth={1.5} />
-        <div className="g-label" style={{ color: "var(--warning)" }}>Verification Queue — {visible.length} pending</div>
+        <div className="g-label" style={{ color: "var(--warning)" }}>
+          {visible.length} pending verification{visible.length !== 1 ? "s" : ""}
+        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {visible.map(claim => {
@@ -311,7 +324,7 @@ function VerificationPanel({
           )
         })}
       </div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -325,6 +338,7 @@ export default function MissionsPage() {
   const [pending,     setPending]     = useState<ApiClaim[]>([])
   const [xpMap,       setXpMap]       = useState<Record<string, number>>({})
   const [loading,     setLoading]     = useState(true)
+  const [activeTab,   setActiveTab]   = useState<"board" | "verify">("board")
 
   const refresh = useCallback(async () => {
     try {
@@ -515,16 +529,20 @@ export default function MissionsPage() {
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
         {[
-          { label: "Open",        count: openMissions.length,       color: "var(--text-3)",  icon: Target       },
-          { label: "In Progress", count: inProgressMissions.length, color: "var(--warning)", icon: Flame        },
+          { label: "Open",        count: openMissions.length,       color: "var(--text-3)",  icon: Target,  tab: null   },
+          { label: "In Progress", count: inProgressMissions.length, color: "var(--warning)", icon: Flame,   tab: null   },
           { label: currentUser?.role === "team" ? "My Pending" : "Verify Queue",
             count: currentUser?.role === "team" ? awaitingMissions.length : verifyQueueSize,
-            color: "var(--info)", icon: Clock },
-          { label: "Team XP",     count: totalXp,                   color: "#C9A24B",        icon: Trophy       },
+            color: verifyQueueSize > 0 && currentUser?.role !== "team" ? "#F59E0B" : "var(--info)", icon: ShieldCheck, tab: "verify" as const },
+          { label: "Team XP",     count: totalXp,                   color: "#C9A24B",        icon: Trophy,  tab: null   },
         ].map((s, i) => {
           const Icon = s.icon
+          const clickable = s.tab && currentUser?.role !== "team"
           return (
-            <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className="kpi-card">
+            <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+              className="kpi-card"
+              onClick={() => { if (clickable) setActiveTab(s.tab as "verify") }}
+              style={{ cursor: clickable ? "pointer" : "default", outline: activeTab === s.tab && s.tab ? `2px solid ${s.color}` : "none" }}>
               <div style={{ width: 30, height: 30, borderRadius: 8, background: `${s.color}18`, border: `1px solid ${s.color}28`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10, color: s.color }}>
                 <Icon size={14} strokeWidth={1.5} />
               </div>
@@ -535,15 +553,40 @@ export default function MissionsPage() {
         })}
       </div>
 
-      {/* Admin / Superadmin verification panel */}
+      {/* Tab nav — admin / superadmin only */}
       {(currentUser?.role === "admin" || currentUser?.role === "superadmin") && (
-        <VerificationPanel
-          pending={pending}
-          currentUser={currentUser}
-          onVerify={handleVerify}
-          onReject={handleReject}
-        />
+        <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid var(--brand-edge)", paddingBottom: 0 }}>
+          {([
+            { key: "board",  label: "Mission Board" },
+            { key: "verify", label: "Verify Queue",  badge: verifyQueueSize },
+          ] as const).map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              style={{ padding: "9px 16px", fontSize: 11, fontWeight: 700, border: "none", background: "transparent", cursor: "pointer",
+                color: activeTab === tab.key ? "var(--text-1)" : "var(--text-3)",
+                borderBottom: activeTab === tab.key ? "2px solid #C9A24B" : "2px solid transparent",
+                display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s" }}>
+              {tab.label}
+              {"badge" in tab && tab.badge > 0 && (
+                <span style={{ padding: "1px 7px", background: "#F59E0B", color: "#000", borderRadius: 10, fontSize: 9, fontWeight: 800 }}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       )}
+
+      {/* Verify Queue tab — full width */}
+      {activeTab === "verify" && (currentUser?.role === "admin" || currentUser?.role === "superadmin") ? (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="panel">
+          <VerificationPanel
+            pending={pending}
+            currentUser={currentUser}
+            onVerify={handleVerify}
+            onReject={handleReject}
+          />
+        </motion.div>
+      ) : (
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 18 }}>
         {/* Missions list */}
@@ -708,6 +751,8 @@ export default function MissionsPage() {
           )}
         </div>
       </div>
+
+      )} {/* end board/verify conditional */}
     </div>
   )
 }

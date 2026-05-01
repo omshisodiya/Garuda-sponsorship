@@ -76,7 +76,11 @@ export default function UsersPage() {
   }, [])
 
   useEffect(() => {
-    loadUsers()
+    fetch("/api/users")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.users) setUsers(data.users) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
     fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(d => { if (d?.user) { setMyRole(d.user.role); setMyId(d.user.id) } })
     // Refresh when tab regains focus so cross-session changes appear
     const onFocus = () => loadUsers()
@@ -398,7 +402,7 @@ export default function UsersPage() {
                 </div>
               ))}
               <button className="btn-gold" style={{ width: "100%", justifyContent: "center", marginTop: 6 }} onClick={() => setCreated(null)}>
-                I've saved the credentials
+                I&apos;ve saved the credentials
               </button>
             </motion.div>
           </motion.div>

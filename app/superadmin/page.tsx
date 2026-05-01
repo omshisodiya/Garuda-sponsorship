@@ -13,8 +13,14 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, PieChart, Pie,
 } from "recharts"
-import { CLUB } from "../lib/data"
+import { CLUB, MIN_SPONSORSHIP_AMOUNT } from "../lib/data"
 import type { Lead } from "../lib/data"
+
+const CATEGORY_COLORS = [
+  "#C9A24B", "#60A5FA", "#A78BFA", "#4ADE80",
+  "#F59E0B", "#F43F5E", "#34D399", "#FB923C",
+  "#818CF8", "#FBBF24",
+]
 
 /* ─────────────────────────────────────────────
    ANIMATED COUNTER
@@ -354,7 +360,7 @@ export default function SuperAdminDashboard() {
 
     // High-value leads never contacted
     leads
-      .filter(l => l.status === "not_started" && l.deal_value >= 50000)
+      .filter(l => l.status === "not_started" && l.deal_value >= MIN_SPONSORSHIP_AMOUNT)
       .sort((a, b) => b.deal_value - a.deal_value)
       .slice(0, 2)
       .forEach(l => out.push({
@@ -451,7 +457,18 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  useEffect(() => { loadLeads() }, [])
+  useEffect(() => {
+    fetch("/api/leads")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setLeads(data.leads ?? []) })
+      .catch(() => {})
+      .finally(() => {
+        setDataLoading(false)
+        setLastUpdated(
+          new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+        )
+      })
+  }, [])
 
   function handleRefresh() {
     setRefreshing(true)
@@ -547,11 +564,6 @@ export default function SuperAdminDashboard() {
   ]
 
   /* Category dist computed from fetched leads */
-  const CATEGORY_COLORS = [
-    "#C9A24B", "#60A5FA", "#A78BFA", "#4ADE80",
-    "#F59E0B", "#F43F5E", "#34D399", "#FB923C",
-    "#818CF8", "#FBBF24",
-  ]
   const categoryWithColor = useMemo(() => {
     const cats = new Map<string, { count: number; revenue: number }>()
     for (const l of leads) {

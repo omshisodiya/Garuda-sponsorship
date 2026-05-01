@@ -17,10 +17,13 @@ export default function BriefingPage() {
   const stats = getStats()
 
   useEffect(() => {
-    setUser(localStorage.getItem("user") || "Commander")
-    const now = new Date()
-    setTime(now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }))
-    setDate(now.toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))
+    const t = window.setTimeout(() => {
+      setUser(localStorage.getItem("user") || "Commander")
+      const now = new Date()
+      setTime(now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }))
+      setDate(now.toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))
+    }, 0)
+    return () => window.clearTimeout(t)
   }, [])
 
   const hotLeads   = LEADS.filter(l => l.probability >= 75 && !["won","lost"].includes(l.stage))
@@ -51,7 +54,7 @@ export default function BriefingPage() {
         <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6 }}>
           <span className="status-dot live" />
           <span style={{ fontSize: 11, color: "rgba(74,222,128,0.7)", fontWeight: 600 }}>LIVE BRIEFING</span>
-          <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: 8 }}>Garuda OS · Dandiya Night '26</span>
+          <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: 8 }}>Garuda OS · Dandiya Night &apos;26</span>
         </div>
       </motion.div>
 

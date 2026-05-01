@@ -90,7 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const noLayout = ["/login", "/lock", "/locked", "/change-password"].some(p => pathname?.startsWith(p))
 
   useEffect(() => {
-    setMounted(true)
+    const t = window.setTimeout(() => setMounted(true), 0)
     fetch("/api/auth/me")
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -102,6 +102,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }
       })
       .catch(() => {})
+    return () => window.clearTimeout(t)
   }, [])
 
   useEffect(() => {

@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
-import { LEADS, TEAM, getStats, ALERTS, SIGNALS, CLUB } from "../../lib/data"
+import { LEADS, TEAM, getStats, ALERTS, SIGNALS, CLUB, TIERS } from "../../lib/data"
+
+type CopilotMessage = { role: "system" | "user" | "assistant"; content: string }
+
+const GROQ_MODEL = "llama-3.3-70b-versatile"
 
 function buildContext() {
   const stats = getStats()
@@ -15,6 +18,7 @@ CLUB CONTEXT
 - Club: ${CLUB.name}, ${CLUB.university}
 - Event: ${CLUB.event}
 - Sponsorship Target: ₹${CLUB.target.toLocaleString("en-IN")}
+- Sponsorship Tiers: ${TIERS.map(t => `${t.name} ₹${t.price.toLocaleString("en-IN")}`).join(", ")}
 - Attendees: ${CLUB.attendees.toLocaleString()}+
 - Social Reach: ${CLUB.socialReach.toLocaleString()}+
 - Contact: ${CLUB.email}
@@ -55,62 +59,60 @@ INSTRUCTIONS
 - If data is unavailable, say so explicitly.
 - When drafting emails, CC ${CLUB.email}.
 - Keep responses concise, actionable, and cited (reference specific lead/sponsor names when possible).
-- You can draft emails, suggest next actions, analyze sponsors, score leads, or answer strategy questions.
+- Use only these sponsorship tiers: Partner Sponsor ₹75,000 minimum, Co Sponsor ₹95,000, Title Sponsor ₹1,50,000.
 - Today's date: ${new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}.`
 }
 
 export async function POST(req: NextRequest) {
-  const { messages } = await req.json() as { messages: Array<{ role: "user" | "assistant"; content: string }> }
+  const { messages } = await req.json() as { messages: CopilotMessage[] }
+  const apiKey = process.env.GROQ_API_KEY ?? process.env.NEXT_PUBLIC_GROQ_API_KEY
 
-  if (!process.env.GOOGLE_AI_API_KEY) {
+  if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "GOOGLE_AI_API_KEY not set. Add it to .env.local to enable live AI. Get a free key at https://aistudio.google.com/apikey" }),
+      JSON.stringify({ error: "NEXT_PUBLIC_GROQ_API_KEY is not set. Add it to .env.local and restart the dev server." }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     )
   }
 
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: buildContext(),
-  })
+  const hasSystem = messages.some(m => m.role === "system")
+  const groqMessages: CopilotMessage[] = hasSystem
+    ? messages
+    : [{ role: "system", content: buildContext() }, ...messages]
 
-  // Gemini requires history to start with a user turn — drop leading model messages
-  const rawHistory = messages.slice(0, -1).map(m => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }))
-  const firstUserIdx = rawHistory.findIndex(m => m.role === "user")
-  const history = firstUserIdx === -1 ? [] : rawHistory.slice(firstUserIdx)
-  const lastMessage = messages[messages.length - 1].content
-
-  const chat = model.startChat({ history })
-
-  let result: Awaited<ReturnType<typeof chat.sendMessageStream>>
+  let groqRes: Response
   try {
-    result = await chat.sendMessageStream(lastMessage)
+    groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        stream: true,
+        messages: groqMessages,
+      }),
+    })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Gemini API error"
+    const msg = err instanceof Error ? err.message : "Groq API error"
     return new Response(JSON.stringify({ error: msg }), { status: 502, headers: { "Content-Type": "application/json" } })
   }
 
-  const encoder = new TextEncoder()
-  const readable = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of result.stream) {
-          const text = chunk.text()
-          if (text) controller.enqueue(encoder.encode(text))
-        }
-      } catch {
-        controller.enqueue(encoder.encode("\n\n[Error: stream interrupted]"))
-      } finally {
-        controller.close()
-      }
-    },
-  })
+  if (!groqRes.ok) {
+    const err = await groqRes.json().catch(() => ({}))
+    const msg = err?.error?.message ?? `Groq API error: HTTP ${groqRes.status}`
+    return new Response(JSON.stringify({ error: msg }), { status: 502, headers: { "Content-Type": "application/json" } })
+  }
 
-  return new Response(readable, {
-    headers: { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" },
+  if (!groqRes.body) {
+    return new Response(JSON.stringify({ error: "Groq API returned an empty stream." }), { status: 502, headers: { "Content-Type": "application/json" } })
+  }
+
+  return new Response(groqRes.body, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Content-Type-Options": "nosniff",
+    },
   })
 }

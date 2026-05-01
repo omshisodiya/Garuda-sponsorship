@@ -12,6 +12,8 @@ export const CLUB = {
   socialReach: 45000,
 }
 
+export const MIN_SPONSORSHIP_AMOUNT = 75000
+
 export const TEAM = [
   { id: "u1",  name: "Om Shisodiya",          role: "Chairperson",          tier: "superadmin", color: "#C9A24B", initials: "OS" },
   { id: "u2",  name: "Vatsal Sharma",          role: "Vice Chairperson",     tier: "admin",      color: "#60A5FA", initials: "VS" },
@@ -84,12 +86,12 @@ export function getStats() {
 
 // ── MONTHLY TREND ──
 export const MONTHLY_REVENUE = [
-  { month: "Jan", secured: 0,      pipeline: 18000  },
-  { month: "Feb", secured: 0,      pipeline: 35000  },
-  { month: "Mar", secured: 60000,  pipeline: 90000  },
-  { month: "Apr", secured: 110000, pipeline: 185000 },
-  { month: "May", secured: 0,      pipeline: 290000 },
-  { month: "Jun", secured: 0,      pipeline: 400000 },
+  { month: "Jan", secured: 0,      pipeline: 75000  },
+  { month: "Feb", secured: 0,      pipeline: 95000  },
+  { month: "Mar", secured: 75000,  pipeline: 150000 },
+  { month: "Apr", secured: 150000, pipeline: 245000 },
+  { month: "May", secured: 0,      pipeline: 320000 },
+  { month: "Jun", secured: 0,      pipeline: 500000 },
 ]
 
 // ── CATEGORY DISTRIBUTION ──
@@ -132,8 +134,8 @@ export const ALERTS = [
   { id: "a1", severity: "critical" as const, title: "Negotiation Deadline: Red Bull India", desc: "Deal deadline in 48 hours. Escalate if no response.", lead: "L001", time: "2 hours ago", ack: false },
   { id: "a2", severity: "warning"  as const, title: "Stalled Lead: Zomato", desc: "No activity for 7 days. Follow-up overdue.", lead: "L006", time: "5 hours ago", ack: false },
   { id: "a3", severity: "warning"  as const, title: "Follow-up Overdue: Samsung India", desc: "No contact made since lead was created.", lead: "L014", time: "1 day ago", ack: false },
-  { id: "a4", severity: "info"     as const, title: "Milestone: 22% of target secured", desc: "₹1,10,000 secured. Team is on track.", lead: null, time: "2 days ago", ack: true },
-  { id: "a5", severity: "notice"   as const, title: "High-Value Lead Added: Nike India", desc: "₹2,00,000 prospect added to pipeline.", lead: "L015", time: "3 days ago", ack: true },
+  { id: "a4", severity: "info"     as const, title: "Milestone: 30% of target secured", desc: "₹1,50,000 secured. Team is on track.", lead: null, time: "2 days ago", ack: true },
+  { id: "a5", severity: "notice"   as const, title: "High-Value Lead Added: Nike India", desc: "₹1,50,000 Title Sponsor prospect added to pipeline.", lead: "L015", time: "3 days ago", ack: true },
 ]
 
 // ── SIGNALS ──
@@ -147,9 +149,7 @@ export const SIGNALS = [
 
 // ── SPONSORSHIP TIERS ──
 export const TIERS = [
-  { name: "Title",     price: 150000, perks: ["Logo on all banners", "30s brand slot at opening", "Activation booth 15×15ft", "20+ social posts", "Email to 5K+ students", "Post-event report"], color: "#C9A24B", fill: "#C9A24B" },
-  { name: "Co-Title",  price: 100000, perks: ["Logo on main banner", "15s brand slot", "Activation booth 10×10ft", "12+ social posts", "Email to 3K students"], color: "#60A5FA", fill: "#60A5FA" },
-  { name: "Gold",      price: 75000,  perks: ["Logo on stage banner", "Brand mention at events", "Activation table", "8+ social posts"], color: "#FBBF24", fill: "#FBBF24" },
-  { name: "Silver",    price: 50000,  perks: ["Logo on select banners", "5+ social posts", "Brand table"], color: "#94A3B8", fill: "#94A3B8" },
-  { name: "Associate", price: 25000,  perks: ["Logo in event program", "3+ social posts"], color: "#A78BFA", fill: "#A78BFA" },
+  { name: "Partner Sponsor", price: 75000,  perks: ["Logo on stage banner", "Brand mention during event", "Activation table", "8+ social posts"], color: "#FBBF24", fill: "#FBBF24" },
+  { name: "Co Sponsor",      price: 95000,  perks: ["Logo on main banner", "15s brand slot", "Activation booth 10×10ft", "12+ social posts", "Email to 3K students"], color: "#60A5FA", fill: "#60A5FA" },
+  { name: "Title Sponsor",   price: 150000, perks: ["Logo on all banners", "30s brand slot at opening", "Activation booth 15×15ft", "20+ social posts", "Email to 5K+ students", "Post-event report"], color: "#C9A24B", fill: "#C9A24B" },
 ]

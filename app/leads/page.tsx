@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Search, Upload, Plus, X, Mail, Phone, ChevronRight,
@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
-  TEAM, CATEGORIES, type Lead, type LeadStatus, type LeadStage, type Category,
+  TEAM, CATEGORIES, MIN_SPONSORSHIP_AMOUNT, type Lead, type LeadStatus, type LeadStage, type Category,
 } from "../lib/data"
 
 const STATUS_COLORS: Record<LeadStatus, string> = {
@@ -58,19 +58,13 @@ export default function LeadsPage() {
   // new lead form
   const [form, setForm] = useState({ company: "", poc_name: "", poc_email: "", poc_phone: "", category: "FMCG" as Category, deal_value: "", notes: "" })
 
-  const fetchLeads = useCallback(async () => {
-    try {
-      const res = await fetch("/api/leads")
-      if (res.ok) {
-        const data = await res.json()
-        setLeads(data.leads ?? [])
-      }
-    } catch { /* silent */ } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    fetch("/api/leads")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setLeads(data.leads ?? []) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
-
-  useEffect(() => { fetchLeads() }, [fetchLeads])
 
   const filtered = useMemo(() => {
     return leads.filter(l => {
@@ -99,7 +93,7 @@ export default function LeadsPage() {
           status:       "not_started" as LeadStatus,
           stage:        "prospect" as LeadStage,
           assigned_to:  null,
-          deal_value:   parseInt(r["Deal Value"] || r["Amount"] || "25000") || 25000,
+          deal_value:   parseInt(r["Deal Value"] || r["Amount"] || String(MIN_SPONSORSHIP_AMOUNT)) || MIN_SPONSORSHIP_AMOUNT,
           probability:  25,
           notes:        r["Notes"] || "",
           last_activity: today,
@@ -138,7 +132,7 @@ export default function LeadsPage() {
           company: form.company, poc_name: form.poc_name,
           poc_email: form.poc_email, poc_phone: form.poc_phone,
           category: form.category, status: "not_started", stage: "prospect",
-          assigned_to: null, deal_value: parseInt(form.deal_value) || 25000,
+          assigned_to: null, deal_value: parseInt(form.deal_value) || MIN_SPONSORSHIP_AMOUNT,
           probability: 25, notes: form.notes,
           last_activity: today, created_by: "u1",
         }),
@@ -422,7 +416,7 @@ export default function LeadsPage() {
                   { label: "POC Name",     key: "poc_name", placeholder: "e.g. Arjun Mehta", required: true },
                   { label: "Email",        key: "poc_email", placeholder: "contact@company.com" },
                   { label: "Phone",        key: "poc_phone", placeholder: "+91 XXXXX XXXXX" },
-                  { label: "Deal Value (₹)", key: "deal_value", placeholder: "e.g. 50000" },
+                  { label: "Deal Value (₹)", key: "deal_value", placeholder: "e.g. 75000" },
                 ].map(f => (
                   <div key={f.key}>
                     <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>{f.label}{f.required && " *"}</label>

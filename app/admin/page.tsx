@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { useSecurityStore } from "../lib/securityStore"
-import { TEAM, ALERTS } from "../lib/data"
+import { TEAM, ALERTS, CLUB } from "../lib/data"
 import type { Lead } from "../lib/data"
 import type { AuditEntry } from "../lib/server/store"
 
@@ -138,7 +138,7 @@ export default function AdminPage() {
           { label: "Total Leads",     value: stats.total,     icon: <Target size={16} strokeWidth={1.5} />,     color: "#60A5FA", sub: `${stats.total - stats.assigned} unassigned` },
           { label: "Assigned",        value: stats.assigned,  icon: <Users size={16} strokeWidth={1.5} />,      color: "#C9A24B", sub: `${Math.round(stats.assigned / Math.max(stats.total, 1) * 100)}% coverage` },
           { label: "Confirmed",       value: stats.confirmed, icon: <CheckCircle size={16} strokeWidth={1.5} />, color: "#4ADE80", sub: `${Math.round(stats.confirmed / Math.max(stats.total, 1) * 100)}% win rate` },
-          { label: "Revenue Secured", value: stats.secured,   icon: <TrendingUp size={16} strokeWidth={1.5} />, color: "#A78BFA", prefix: "₹", format: (v: number) => v.toLocaleString("en-IN"), sub: `of ₹5,00,000 target` },
+          { label: "Revenue Secured", value: stats.secured,   icon: <TrendingUp size={16} strokeWidth={1.5} />, color: "#A78BFA", prefix: "₹", format: (v: number) => v.toLocaleString("en-IN"), sub: `of ₹${CLUB.target.toLocaleString("en-IN")} target` },
         ].map((kpi, i) => (
           <motion.div key={kpi.label} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="kpi-card">
             <div style={{ position: "absolute", top: 0, left: 0, width: 36, height: 2.5, background: kpi.color, borderRadius: "18px 0 3px 0" }} />

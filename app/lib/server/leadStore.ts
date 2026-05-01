@@ -1,9 +1,8 @@
-import type { Lead, TeamMemberId } from "../data"
+import { CLUB, type Lead } from "../data"
 import SEED_JSON from "./seedLeads.json"
 const SEED_LEADS = SEED_JSON as unknown as Lead[]
 
 declare global {
-  // eslint-disable-next-line no-var
   var __garuda_leads: Lead[] | undefined
 }
 
@@ -77,9 +76,9 @@ export function computeStats(leads: Lead[]) {
     confirmed:      confirmed.length,
     pipeline:       Math.round(pipeline),
     secured,
-    target:         500000,
-    progressPct:    Math.round((secured / 500000) * 100),
-    pipelinePct:    Math.round(((secured + pipeline) / 500000) * 100),
+    target:         CLUB.target,
+    progressPct:    Math.round((secured / CLUB.target) * 100),
+    pipelinePct:    Math.round(((secured + pipeline) / CLUB.target) * 100),
     conversionRate,
     followUpsDue:   followUpsDue.length,
   }

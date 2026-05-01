@@ -183,7 +183,7 @@ export default function ApolloPage() {
             onClick={() => openApollo(query)}
             style={{ fontSize: 12 }}
           >
-            ↗ Search "{query}" on Apollo.io
+            ↗ Search &quot;{query}&quot; on Apollo.io
           </motion.button>
         )}
       </motion.div>
@@ -271,7 +271,7 @@ export default function ApolloPage() {
           {filtered.length === 0 && (
             <div style={{ padding: "40px", textAlign: "center" }}>
               <div style={{ fontSize: 14, color: "rgba(246,231,201,0.3)", marginBottom: 14 }}>
-                No contacts found for "{query}"
+                No contacts found for &quot;{query}&quot;
               </div>
               <button
                 className="btn-gold"

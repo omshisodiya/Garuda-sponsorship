@@ -17,9 +17,9 @@ export default function RecordsPage() {
   }).sort((a, b) => b.secured - a.secured)
 
   const milestones = [
-    { title: "First Deal Closed",          value: "Puma India — ₹60,000",            date: "Apr 15, 2026",  icon: Star,       color: "var(--success)"  },
-    { title: "Associate Sponsor Secured",  value: "Campus Shoes — ₹50,000",          date: "Apr 10, 2026",  icon: CheckCircle, color: "var(--info)"    },
-    { title: "20% Revenue Target Reached", value: "₹1,10,000 secured",               date: "Apr 20, 2026",  icon: TrendingUp, color: "#C9A24B"          },
+    { title: "First Deal Closed",          value: "Puma India — ₹75,000",            date: "Apr 15, 2026",  icon: Star,       color: "var(--success)"  },
+    { title: "Partner Sponsor Secured",    value: "Campus Shoes — ₹75,000",          date: "Apr 10, 2026",  icon: CheckCircle, color: "var(--info)"    },
+    { title: "30% Revenue Target Reached", value: "₹1,50,000 secured",               date: "Apr 20, 2026",  icon: TrendingUp, color: "#C9A24B"          },
     { title: "First Negotiation Stage",    value: "Red Bull India — ₹1,50,000",      date: "Apr 22, 2026",  icon: Target,     color: "var(--warning)"  },
     { title: "5 Active Deals Milestone",   value: "In Discussion across categories", date: "Apr 25, 2026",  icon: Award,      color: "#A78BFA"          },
   ]
@@ -117,7 +117,7 @@ export default function RecordsPage() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="panel" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", gap: 8 }}>
           <CheckCircle size={14} color="var(--success)" strokeWidth={1.5} />
-          <div className="g-label">Confirmed Sponsors — Dandiya Night '26</div>
+          <div className="g-label">Confirmed Sponsors — Dandiya Night &apos;26</div>
         </div>
         <table className="g-table">
           <thead><tr><th>Company</th><th>Category</th><th>Deal Value</th><th>Closed By</th><th>Confirmed</th></tr></thead>

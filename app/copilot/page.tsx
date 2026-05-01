@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Send, Brain, RotateCcw, Zap, Target, Mail, TrendingUp, Shield, Flame } from "lucide-react"
-import { LEADS, TEAM, getStats, ALERTS, SIGNALS, CLUB } from "../lib/data"
+import { LEADS, TEAM, getStats, ALERTS, SIGNALS, CLUB, TIERS } from "../lib/data"
 
 type Message = { role: "user" | "assistant"; content: string; timestamp: string }
 
@@ -33,6 +33,7 @@ CLUB CONTEXT
 - Club: ${CLUB.name}, ${CLUB.university}
 - Event: ${CLUB.event}
 - Sponsorship Target: ₹${CLUB.target.toLocaleString("en-IN")}
+- Sponsorship Tiers: ${TIERS.map(t => `${t.name} ₹${t.price.toLocaleString("en-IN")}`).join(", ")}
 - Attendees: ${CLUB.attendees.toLocaleString()}+
 - Social Reach: ${CLUB.socialReach.toLocaleString()}+
 - Contact: ${CLUB.email}
@@ -78,7 +79,7 @@ export default function CopilotPage() {
   ])
   const [input, setInput]       = useState("")
   const [loading, setLoading]   = useState(false)
-  const [apiAvail, setApiAvail] = useState(!!process.env.NEXT_PUBLIC_GROQ_API_KEY)
+  const [apiAvail, setApiAvail] = useState(true)
   const bottomRef               = useRef<HTMLDivElement>(null)
   const abortRef                = useRef<boolean>(false)
 
@@ -91,13 +92,6 @@ export default function CopilotPage() {
     if (!query || loading) return
     setInput("")
 
-    const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY
-    if (!apiKey) {
-      setApiAvail(false)
-      setMessages(prev => [...prev, { role: "assistant", content: "NEXT_PUBLIC_GROQ_API_KEY is not set in .env.local. Get a free key at console.groq.com then restart the dev server.", timestamp: getTime() }])
-      return
-    }
-
     const userMsg: Message = { role: "user", content: query, timestamp: getTime() }
     const history = [...messages, userMsg]
     setMessages(history)
@@ -105,9 +99,9 @@ export default function CopilotPage() {
     abortRef.current = false
 
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch("/api/copilot", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
           stream: true,
@@ -120,6 +114,7 @@ export default function CopilotPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+        if (res.status === 503) setApiAvail(false)
         throw new Error(err?.error?.message ?? `HTTP ${res.status}`)
       }
 
@@ -176,12 +171,12 @@ export default function CopilotPage() {
         <div>
           <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>AI · Garuda Brain</div>
           <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: 0 }}>AI Copilot</h1>
-          <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>Live context · Pipeline-aware · Google Gemini</p>
+          <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>Live context · Pipeline-aware · Groq AI</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {!apiAvail && (
             <div style={{ fontSize: 11, color: "var(--warning)", background: "var(--warning-bg)", border: "1px solid var(--warning-edge)", borderRadius: "var(--r-sm)", padding: "5px 10px" }}>
-              Add NEXT_PUBLIC_GROQ_API_KEY to .env.local
+              Add NEXT_PUBLIC_GROQ_API_KEY to .env.local and restart dev server
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

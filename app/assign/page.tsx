@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Search, GitBranch, CheckSquare, Square, Loader } from "lucide-react"
 import { TEAM } from "../lib/data"
@@ -16,19 +16,13 @@ export default function AssignPage() {
 
   const assignable = TEAM.filter(m => m.tier !== "superadmin")
 
-  const fetchLeads = useCallback(async () => {
-    try {
-      const res = await fetch("/api/leads")
-      if (res.ok) {
-        const data = await res.json()
-        setLeads(data.leads ?? [])
-      }
-    } catch { /* silent */ } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    fetch("/api/leads")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setLeads(data.leads ?? []) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
-
-  useEffect(() => { fetchLeads() }, [fetchLeads])
 
   const filtered = useMemo(() =>
     leads.filter(l =>
@@ -71,7 +65,8 @@ export default function AssignPage() {
   function toggle(id: string) {
     setSelected(prev => {
       const s = new Set(prev)
-      s.has(id) ? s.delete(id) : s.add(id)
+      if (s.has(id)) s.delete(id)
+      else s.add(id)
       return s
     })
   }

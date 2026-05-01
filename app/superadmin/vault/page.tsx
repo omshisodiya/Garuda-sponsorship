@@ -65,10 +65,13 @@ export default function CredentialVaultPage() {
 
   // Load persisted credentials from localStorage
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) setCreds(JSON.parse(saved))
-    } catch { /* ignore */ }
+    const t = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) setCreds(JSON.parse(saved))
+      } catch { /* ignore */ }
+    }, 0)
+    return () => window.clearTimeout(t)
   }, [])
 
   function persist(updated: Credential[]) {
@@ -77,7 +80,12 @@ export default function CredentialVaultPage() {
   }
 
   function toggle(id: string) {
-    setRevealed(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setRevealed(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
   }
 
   function unlock(e: React.FormEvent) {

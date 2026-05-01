@@ -32,7 +32,7 @@ Why Partner With Us
 • Strong brand recall through authentic campus association
 • Long-term visibility via professionally curated post-event digital content
 
-We offer flexible sponsorship packages starting from ₹75,000, with exclusive Title Sponsorship opportunities at ₹1,50,000, which can be further customized to align with your marketing objectives.
+We offer three sponsorship tiers: Partner Sponsor starting at ₹75,000, Co Sponsor at ₹95,000, and Title Sponsor at ₹1,50,000, each customizable to align with your marketing objectives.
 
 I would be happy to schedule a brief 20-minute discussion to explore how we can create a meaningful and high-impact partnership for [Company].
 

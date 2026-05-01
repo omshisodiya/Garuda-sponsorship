@@ -40,7 +40,7 @@ export default function VaultPage() {
         <div>
           <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>Revenue · Intelligence Vault</div>
           <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: 0 }}>Revenue Vault</h1>
-          <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>Target ₹{CLUB.target.toLocaleString("en-IN")} · Dandiya Night '26</p>
+          <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>Target ₹{CLUB.target.toLocaleString("en-IN")} · Dandiya Night &apos;26</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn-ghost" onClick={() => setShowProb(p => !p)} style={{ fontSize: 11 }}>
@@ -129,7 +129,7 @@ export default function VaultPage() {
               <motion.div key={tier.name} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 + 0.3 }}
                 style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "rgba(0,0,0,0.2)", border: `1px solid ${tier.color}20`, borderLeft: `3px solid ${tier.color}`, borderRadius: "var(--r-md)" }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: tier.color }}>{tier.name} Sponsor</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: tier.color }}>{tier.name}</div>
                   <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>{tier.perks[0]} · {tier.perks[1]}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>

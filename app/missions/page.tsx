@@ -24,7 +24,7 @@ const MISSIONS: Mission[] = [
   { id: "m2", title: "Proposal Push",            desc: "Submit custom sponsorship proposals to 3 leads currently in Qualified stage.",    target: "3 proposals sent",  deadline: "May 3, 2026",  points: 200, status: "claimed",  claimedBy: "u5",  category: "pipeline"  },
   { id: "m3", title: "Close the boAt Deal",      desc: "Move boAt from Negotiation to Won. Final offer + signed confirmation required.", target: "1 deal confirmed",  deadline: "May 2, 2026",  points: 500, status: "claimed",  claimedBy: "u9",  category: "deal"      },
   { id: "m4", title: "Unassigned Lead Sweep",    desc: "Contact all unassigned leads and add first notes within 48 hours.",             target: "4 leads activated", deadline: "May 7, 2026",  points: 100, status: "complete", claimedBy: "u6",  category: "outreach"  },
-  { id: "m5", title: "FMCG Category Lock",       desc: "Secure at least one FMCG brand as Associate Sponsor or higher.",               target: "1 FMCG confirmed",  deadline: "May 10, 2026", points: 350, status: "open",     claimedBy: null,  category: "deal"      },
+  { id: "m5", title: "FMCG Category Lock",       desc: "Secure at least one FMCG brand as Partner Sponsor or higher.",                 target: "1 FMCG confirmed",  deadline: "May 10, 2026", points: 350, status: "open",     claimedBy: null,  category: "deal"      },
   { id: "m6", title: "Social Proof Sprint",      desc: "Collect testimonials or references from 2 confirmed sponsors for outreach.",   target: "2 testimonials",    deadline: "May 8, 2026",  points: 120, status: "verified", claimedBy: "u7",  category: "special"   },
 ]
 

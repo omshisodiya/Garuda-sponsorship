@@ -1,5 +1,6 @@
 import { db, type Row } from "./db"
 import { CLUB, type Lead } from "../data"
+import seedData from "./seedLeads.json"
 
 // ── Table init ────────────────────────────────────────────────────────────────
 let _initPromise: Promise<void> | null = null
@@ -30,6 +31,29 @@ async function _init(): Promise<void> {
       screenshots   JSONB   NOT NULL DEFAULT '{}'
     )
   `
+  // Seed from JSON if table is empty
+  const countRows = await sql`SELECT COUNT(*)::int AS cnt FROM garuda_leads`
+  const count = (countRows[0]?.cnt as number) ?? 0
+  if (count === 0) {
+    const BATCH = 50
+    const seeds = seedData as Array<Record<string, unknown>>
+    for (let i = 0; i < seeds.length; i += BATCH) {
+      await Promise.all(seeds.slice(i, i + BATCH).map(lead => sql`
+        INSERT INTO garuda_leads
+          (id, company, poc_name, poc_email, poc_phone, category, status, stage,
+           assigned_to, deal_value, probability, notes, last_activity, created_at, created_by, screenshots)
+        VALUES
+          (${String(lead.id)}, ${String(lead.company)}, ${String(lead.poc_name ?? "")},
+           ${String(lead.poc_email ?? "")}, ${String(lead.poc_phone ?? "")},
+           ${String(lead.category ?? "FMCG")}, ${String(lead.status ?? "not_started")},
+           ${String(lead.stage ?? "prospect")}, ${(lead.assigned_to as string | null) ?? null},
+           ${Number(lead.deal_value ?? 75000)}, ${Number(lead.probability ?? 20)},
+           ${String(lead.notes ?? "")}, ${String(lead.last_activity ?? "")},
+           ${String(lead.created_at ?? "")}, ${String(lead.created_by ?? "u1")}, '{}')
+        ON CONFLICT (id) DO NOTHING
+      `))
+    }
+  }
 }
 
 // ── Row → Lead ────────────────────────────────────────────────────────────────

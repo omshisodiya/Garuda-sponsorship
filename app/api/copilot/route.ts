@@ -6,8 +6,8 @@ type CopilotMessage = { role: "system" | "user" | "assistant"; content: string }
 
 const GROQ_MODEL = "llama-3.3-70b-versatile"
 
-function buildContext() {
-  const leads   = getAllLeads()
+async function buildContext() {
+  const leads   = await getAllLeads()
   const stats   = computeStats(leads)
   const alerts  = computeAlerts(leads)
   const signals = computeSignals(leads)
@@ -30,7 +30,7 @@ CLUB CONTEXT
 
 LIVE PIPELINE SNAPSHOT
 - Total leads: ${stats.total}
-- Assigned: ${stats.assigned}
+- Assigned: ${stats.assigned} | Unassigned: ${stats.unassigned}
 - Contacted: ${stats.contacted}
 - In Discussion: ${stats.inDiscussion}
 - Confirmed sponsors: ${stats.confirmed} (₹${stats.secured.toLocaleString("en-IN")} secured)
@@ -42,9 +42,12 @@ CONFIRMED SPONSORS (${confirmed.length})
 ${confirmed.length > 0 ? confirmed.map(l => `- ${l.company}: ₹${l.deal_value.toLocaleString("en-IN")} (${l.stage})`).join("\n") : "- None yet"}
 
 HOT LEADS — High probability, not yet confirmed (${hotLeads.length})
-${hotLeads.length > 0 ? hotLeads.map(l => `- ${l.company} [${l.category}]: ₹${l.deal_value.toLocaleString("en-IN")}, ${l.probability}% probability, stage: ${l.stage}, assigned to: ${TEAM.find(m => m.id === l.assigned_to)?.name || "Unassigned"}`).join("\n") : "- None"}
+${hotLeads.length > 0 ? hotLeads.map(l => {
+  const member = TEAM.find(m => m.id === l.assigned_to)
+  return `- ${l.company} [${l.category}]: ₹${l.deal_value.toLocaleString("en-IN")}, ${l.probability}% probability, stage: ${l.stage}, assigned to: ${member?.name || "Unassigned"}`
+}).join("\n") : "- None"}
 
-STALLED LEADS — Negotiation but low probability (${stalled.length})
+STALLED LEADS (${stalled.length})
 ${stalled.length > 0 ? stalled.map(l => `- ${l.company}: ₹${l.deal_value.toLocaleString("en-IN")}, ${l.probability}%, last touch: ${l.last_activity}`).join("\n") : "- None"}
 
 PIPELINE LEADS (${pipeline.length})
@@ -56,49 +59,38 @@ ${alerts.filter(a => !a.ack).length > 0 ? alerts.filter(a => !a.ack).map(a => `-
 AI SIGNALS
 ${signals.length > 0 ? signals.map(s => `- [${s.type.toUpperCase()}] ${s.company}: ${s.title} (score: ${s.score}%)`).join("\n") : "- No signals"}
 
-TEAM (${TEAM.length} members)
-${TEAM.filter(m => m.tier !== "superadmin").slice(0, 20).map(m => `- ${m.name} (${m.role}): ${leads.filter(l => l.assigned_to === m.id).length} leads`).join("\n")}
-
 INSTRUCTIONS
-- Answer questions from live context above. Never fabricate numbers.
+- Answer from live context above. Never fabricate numbers.
 - If data is unavailable, say so explicitly.
 - When drafting emails, CC ${CLUB.email}.
-- Keep responses concise, actionable, and cited (reference specific lead/sponsor names when possible).
+- Keep responses concise and actionable.
 - Use only these sponsorship tiers: Partner Sponsor ₹75,000, Co Sponsor ₹95,000, Title Sponsor ₹1,50,000.
 - Today's date: ${new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}.`
 }
 
 export async function POST(req: NextRequest) {
   const { messages } = await req.json() as { messages: CopilotMessage[] }
-  const apiKey =
-    process.env.GROQ_API_KEY ||
-    process.env.NEXT_PUBLIC_GROQ_API_KEY
+  const apiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY
 
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "GROQ_API_KEY is not set. Add it to .env.local and restart the dev server." }),
+      JSON.stringify({ error: "GROQ_API_KEY is not set. Add it to .env.local and restart." }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     )
   }
 
+  const context = await buildContext()
   const hasSystem = messages.some(m => m.role === "system")
   const groqMessages: CopilotMessage[] = hasSystem
     ? messages
-    : [{ role: "system", content: buildContext() }, ...messages]
+    : [{ role: "system", content: context }, ...messages]
 
   let groqRes: Response
   try {
     groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        stream: true,
-        messages: groqMessages,
-      }),
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: GROQ_MODEL, stream: true, messages: groqMessages }),
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Groq API error"
@@ -107,12 +99,12 @@ export async function POST(req: NextRequest) {
 
   if (!groqRes.ok) {
     const err = await groqRes.json().catch(() => ({}))
-    const msg = (err as { error?: { message?: string } })?.error?.message ?? `Groq API error: HTTP ${groqRes.status}`
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? `Groq HTTP ${groqRes.status}`
     return new Response(JSON.stringify({ error: msg }), { status: 502, headers: { "Content-Type": "application/json" } })
   }
 
   if (!groqRes.body) {
-    return new Response(JSON.stringify({ error: "Groq API returned an empty stream." }), { status: 502, headers: { "Content-Type": "application/json" } })
+    return new Response(JSON.stringify({ error: "Empty stream" }), { status: 502, headers: { "Content-Type": "application/json" } })
   }
 
   return new Response(groqRes.body, {

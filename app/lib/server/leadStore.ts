@@ -1,70 +1,167 @@
+import { db, type Row } from "./db"
 import { CLUB, type Lead } from "../data"
-import SEED_JSON from "./seedLeads.json"
-const SEED_LEADS = SEED_JSON as unknown as Lead[]
 
-declare global {
-  var __garuda_leads: Lead[] | undefined
+// ── Table init ────────────────────────────────────────────────────────────────
+let _initPromise: Promise<void> | null = null
+function ensureInit(): Promise<void> {
+  if (!_initPromise) _initPromise = _init()
+  return _initPromise
 }
 
-const LEADS: Lead[] = globalThis.__garuda_leads ?? SEED_LEADS.map(l => ({ ...l }))
-globalThis.__garuda_leads = LEADS
-
-let _idCounter = LEADS.length
-
-export function getAllLeads(): Lead[] {
-  return LEADS
+async function _init(): Promise<void> {
+  const sql = db()
+  await sql`
+    CREATE TABLE IF NOT EXISTS garuda_leads (
+      id            TEXT PRIMARY KEY,
+      company       TEXT    NOT NULL,
+      poc_name      TEXT    NOT NULL DEFAULT '',
+      poc_email     TEXT    NOT NULL DEFAULT '',
+      poc_phone     TEXT    NOT NULL DEFAULT '',
+      category      TEXT    NOT NULL DEFAULT 'FMCG',
+      status        TEXT    NOT NULL DEFAULT 'not_started',
+      stage         TEXT    NOT NULL DEFAULT 'prospect',
+      assigned_to   TEXT,
+      deal_value    INTEGER NOT NULL DEFAULT 75000,
+      probability   INTEGER NOT NULL DEFAULT 25,
+      notes         TEXT    NOT NULL DEFAULT '',
+      last_activity TEXT    NOT NULL DEFAULT '',
+      created_at    TEXT    NOT NULL DEFAULT '',
+      created_by    TEXT    NOT NULL DEFAULT 'u1',
+      screenshots   JSONB   NOT NULL DEFAULT '{}'
+    )
+  `
 }
 
-export function getLeadById(id: string): Lead | null {
-  return LEADS.find(l => l.id === id) ?? null
+// ── Row → Lead ────────────────────────────────────────────────────────────────
+function rowToLead(row: Row): Lead {
+  return {
+    id:            String(row.id ?? ""),
+    company:       String(row.company ?? ""),
+    poc_name:      String(row.poc_name ?? ""),
+    poc_email:     String(row.poc_email ?? ""),
+    poc_phone:     String(row.poc_phone ?? ""),
+    category:      (row.category as Lead["category"]) ?? "FMCG",
+    status:        (row.status  as Lead["status"])   ?? "not_started",
+    stage:         (row.stage   as Lead["stage"])    ?? "prospect",
+    assigned_to:   (row.assigned_to as string | null) ?? null,
+    deal_value:    (row.deal_value  as number) ?? 75000,
+    probability:   (row.probability as number) ?? 25,
+    notes:         String(row.notes ?? ""),
+    last_activity: String(row.last_activity ?? ""),
+    created_at:    String(row.created_at ?? ""),
+    created_by:    String(row.created_by ?? "u1"),
+    screenshots:   (row.screenshots as Record<string, string>) ?? {},
+  }
 }
 
-export function getLeadsByAssignee(userId: string): Lead[] {
-  return LEADS.filter(l => l.assigned_to === userId)
+// ── Unique ID ─────────────────────────────────────────────────────────────────
+function newLeadId(): string {
+  return `L${Date.now()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`
 }
 
-export function updateLead(
+// ── Read ──────────────────────────────────────────────────────────────────────
+export async function getAllLeads(): Promise<Lead[]> {
+  await ensureInit()
+  const rows = await db()`SELECT * FROM garuda_leads ORDER BY created_at DESC`
+  return rows.map(r => rowToLead(r as Row))
+}
+
+export async function getLeadById(id: string): Promise<Lead | null> {
+  await ensureInit()
+  const rows = await db()`SELECT * FROM garuda_leads WHERE id = ${id}`
+  return rows[0] ? rowToLead(rows[0] as Row) : null
+}
+
+export async function getLeadsByAssignee(userId: string): Promise<Lead[]> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT * FROM garuda_leads WHERE assigned_to = ${userId} ORDER BY created_at DESC
+  `
+  return rows.map(r => rowToLead(r as Row))
+}
+
+// ── Write ─────────────────────────────────────────────────────────────────────
+export async function createLead(lead: Omit<Lead, "id" | "created_at">): Promise<Lead> {
+  await ensureInit()
+  const id         = newLeadId()
+  const created_at = new Date().toISOString().split("T")[0]
+  const sql        = db()
+
+  await sql`
+    INSERT INTO garuda_leads
+      (id, company, poc_name, poc_email, poc_phone, category, status, stage,
+       assigned_to, deal_value, probability, notes, last_activity, created_at,
+       created_by, screenshots)
+    VALUES
+      (${id}, ${lead.company}, ${lead.poc_name}, ${lead.poc_email}, ${lead.poc_phone},
+       ${lead.category}, ${lead.status}, ${lead.stage}, ${lead.assigned_to ?? null},
+       ${lead.deal_value}, ${lead.probability}, ${lead.notes}, ${lead.last_activity},
+       ${created_at}, ${lead.created_by}, ${JSON.stringify(lead.screenshots ?? {})})
+  `
+  const rows = await sql`SELECT * FROM garuda_leads WHERE id = ${id}`
+  return rowToLead(rows[0] as Row)
+}
+
+export async function updateLead(
   id: string,
   patch: Partial<Omit<Lead, "id" | "created_at" | "created_by">>
-): Lead | null {
-  const idx = LEADS.findIndex(l => l.id === id)
-  if (idx === -1) return null
-  LEADS[idx] = {
-    ...LEADS[idx],
+): Promise<Lead | null> {
+  await ensureInit()
+  const current = await getLeadById(id)
+  if (!current) return null
+
+  const today = new Date().toISOString().split("T")[0]
+  const m = {
+    ...current,
     ...patch,
-    last_activity: new Date().toISOString().split("T")[0],
+    last_activity: today,
+    screenshots: patch.screenshots ?? current.screenshots ?? {},
   }
-  return LEADS[idx]
+
+  await db()`
+    UPDATE garuda_leads SET
+      company       = ${m.company},
+      poc_name      = ${m.poc_name},
+      poc_email     = ${m.poc_email},
+      poc_phone     = ${m.poc_phone},
+      category      = ${m.category},
+      status        = ${m.status},
+      stage         = ${m.stage},
+      assigned_to   = ${m.assigned_to ?? null},
+      deal_value    = ${m.deal_value},
+      probability   = ${m.probability},
+      notes         = ${m.notes},
+      last_activity = ${m.last_activity},
+      screenshots   = ${JSON.stringify(m.screenshots)}
+    WHERE id = ${id}
+  `
+  return m as Lead
 }
 
-export function createLead(lead: Omit<Lead, "id" | "created_at">): Lead {
-  _idCounter++
-  const newLead: Lead = {
-    ...lead,
-    id: `L${String(_idCounter).padStart(3, "0")}`,
-    created_at: new Date().toISOString().split("T")[0],
-  }
-  LEADS.push(newLead)
-  return newLead
+export async function deleteLead(id: string): Promise<boolean> {
+  await ensureInit()
+  const rows = await db()`DELETE FROM garuda_leads WHERE id = ${id} RETURNING id`
+  return rows.length > 0
 }
 
+// ── Stats (pure — takes lead array) ──────────────────────────────────────────
 export function computeStats(leads: Lead[]) {
-  const today = new Date()
-  const threeDaysAgo = new Date(today)
-  threeDaysAgo.setDate(today.getDate() - 3)
+  const today        = new Date()
+  const fiveDaysAgo  = new Date(today); fiveDaysAgo.setDate(today.getDate() - 5)
 
   const confirmed    = leads.filter(l => l.status === "confirmed")
-  const active       = leads.filter(l => !["rejected", "confirmed"].includes(l.status))
+  const active       = leads.filter(l => !["rejected","confirmed"].includes(l.status))
   const secured      = confirmed.reduce((s, l) => s + l.deal_value, 0)
   const pipeline     = active.reduce((s, l) => s + (l.deal_value * l.probability / 100), 0)
-  const contacted    = leads.filter(l => ["contacted", "in_discussion", "confirmed"].includes(l.status))
+  const contacted    = leads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status))
   const inDiscussion = leads.filter(l => l.status === "in_discussion")
   const won          = leads.filter(l => l.stage === "won")
-  const qualified    = leads.filter(l => ["qualified", "proposal", "negotiation", "won"].includes(l.stage))
+  const qualified    = leads.filter(l => ["qualified","proposal","negotiation","won"].includes(l.stage))
   const conversionRate = qualified.length > 0 ? Math.round((won.length / qualified.length) * 100) : 0
   const followUpsDue = leads.filter(l =>
-    !["confirmed", "rejected"].includes(l.status) &&
-    new Date(l.last_activity) < threeDaysAgo
+    !["confirmed","rejected"].includes(l.status) &&
+    l.assigned_to !== null &&
+    new Date(l.last_activity) < fiveDaysAgo
   )
 
   return {

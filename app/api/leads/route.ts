@@ -9,8 +9,8 @@ export async function GET(_req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
 
   const leads = session.role === "team"
-    ? getLeadsByAssignee(session.sub)
-    : getAllLeads()
+    ? await getLeadsByAssignee(session.sub)
+    : await getAllLeads()
 
   return NextResponse.json({ leads })
 }
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   if (!body.company?.trim()) return NextResponse.json({ error: "Company name is required" }, { status: 400 })
 
-  const lead = createLead({ ...body, created_by: session.sub as Lead["created_by"] })
+  const lead = await createLead({ ...body, created_by: session.sub })
   addAudit({
     actor_id:   session.sub,
     actor_name: session.name,

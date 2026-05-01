@@ -64,14 +64,16 @@ async function _init(): Promise<void> {
     )
   `
 
-  const [row] = await sql`SELECT COUNT(*)::int AS count FROM garuda_users`
-  if ((row as { count: number }).count === 0) {
-    await _seed(sql)
+  const countRows = await sql`SELECT COUNT(*)::int AS count FROM garuda_users`
+  const count = (countRows as Array<{ count: number }>)[0]?.count ?? 0
+  if (count === 0) {
+    await _seed()
   }
 }
 
 // ── Seed (runs once when garuda_users is empty) ──────────────────────────────
-async function _seed(sql: ReturnType<typeof db>): Promise<void> {
+async function _seed(): Promise<void> {
+  const sql = db()
   const CREATED_AT = "2026-01-01T00:00:00.000Z"
   const P_SUPER    = hashPassword("9999")
   const P_DEFAULT  = hashPassword("1234")

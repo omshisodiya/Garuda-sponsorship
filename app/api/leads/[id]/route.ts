@@ -47,6 +47,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id: _id, created_at: _ca, created_by: _cb, ...safePatch } =
     body as Partial<Lead> & { id?: string; created_at?: string; created_by?: string }
 
+  // If reassigning, enforce superadmin lock and tag who is assigning
+  if ('assigned_to' in safePatch && safePatch.assigned_to !== lead.assigned_to) {
+    if (lead.assigned_by_role === "superadmin" && session.role !== "superadmin") {
+      return NextResponse.json(
+        { error: "This assignment was locked by a Superadmin and cannot be changed." },
+        { status: 403 }
+      )
+    }
+    ;(safePatch as Record<string, unknown>).assigned_by      = session.sub
+    ;(safePatch as Record<string, unknown>).assigned_by_role = session.role
+  }
+
   const updated = await updateLead(id, safePatch)
   if (!updated) return NextResponse.json({ error: "Update failed" }, { status: 500 })
 

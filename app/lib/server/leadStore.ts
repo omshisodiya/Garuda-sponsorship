@@ -31,6 +31,8 @@ async function _init(): Promise<void> {
       screenshots   JSONB   NOT NULL DEFAULT '{}'
     )
   `
+  await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS assigned_by TEXT`
+  await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS assigned_by_role TEXT`
   // Seed from JSON if table is empty
   const countRows = await sql`SELECT COUNT(*)::int AS cnt FROM garuda_leads`
   const count = (countRows[0]?.cnt as number) ?? 0
@@ -74,6 +76,8 @@ function rowToLead(row: Row): Lead {
     last_activity: String(row.last_activity ?? ""),
     created_at:    String(row.created_at ?? ""),
     created_by:    String(row.created_by ?? "u1"),
+    assigned_by:       row.assigned_by      ? String(row.assigned_by)      : null,
+    assigned_by_role:  row.assigned_by_role ? String(row.assigned_by_role) : null,
     screenshots:   (row.screenshots as Record<string, string>) ?? {},
   }
 }
@@ -152,6 +156,8 @@ export async function updateLead(
       status        = ${m.status},
       stage         = ${m.stage},
       assigned_to   = ${m.assigned_to ?? null},
+      assigned_by   = ${(m as Lead & { assigned_by?: string | null }).assigned_by ?? null},
+      assigned_by_role = ${(m as Lead & { assigned_by_role?: string | null }).assigned_by_role ?? null},
       deal_value    = ${m.deal_value},
       probability   = ${m.probability},
       notes         = ${m.notes},

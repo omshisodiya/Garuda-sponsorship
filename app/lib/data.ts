@@ -97,6 +97,8 @@ export type Lead = {
   status: LeadStatus
   stage: LeadStage
   assigned_to: string | null
+  assigned_by?: string | null
+  assigned_by_role?: string | null
   deal_value: number    // in rupees
   probability: number   // 0-100
   notes: string

@@ -421,6 +421,29 @@ export default function MissionsPage() {
       .sort((a, b) => b.xp - a.xp)
   }, [leads, users, xpMap, lbCategory])
 
+  const lowPerformers = useMemo(() => {
+    return users
+      .filter(u => u.role !== "superadmin")
+      .map(member => {
+        const myLeads   = leads.filter(l => l.assigned_to === member.id)
+        if (myLeads.length === 0) return null
+        const progressed = myLeads.filter(l => l.status !== "not_started").length
+        const mXp = xpMap[member.id] ?? 0
+        const lXp = myLeads.reduce((s, l) => {
+          if (l.status === "confirmed") return s + (l.deal_value >= 150000 ? 400 : l.deal_value >= 95000 ? 300 : l.deal_value > 0 ? 200 : 100)
+          if (l.status === "in_discussion") return s + 75
+          if (l.status === "contacted") return s + 30
+          return s
+        }, 0)
+        const totalXp = mXp + lXp
+        if (totalXp === 0 && progressed === 0) {
+          return { ...member, leadCount: myLeads.length, progressed, totalXp }
+        }
+        return null
+      })
+      .filter((m): m is NonNullable<typeof m> => m !== null)
+  }, [leads, users, xpMap])
+
   async function handleClaim(mission: Mission) {
     if (!currentUser) return
     await fetch("/api/missions/action", {
@@ -653,6 +676,33 @@ export default function MissionsPage() {
                 {currentUser.role === "superadmin" && "As Superadmin you can verify any completed mission — from admins and team members alike."}
                 {currentUser.role === "admin" && "As Admin you can verify Team member completions. Your own completed missions require Superadmin approval."}
                 {currentUser.role === "team" && "Claim → do the work → Mark Complete. An Admin or Superadmin will verify. After verification the mission resets so you can claim it again for more XP."}
+              </div>
+            </motion.div>
+          )}
+
+          {(currentUser?.role === "admin" || currentUser?.role === "superadmin") && lowPerformers.length > 0 && (
+            <motion.div initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className="panel"
+              style={{ borderColor: "rgba(248,113,113,0.2)", background: "rgba(248,113,113,0.04)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#F87171", flexShrink: 0 }} />
+                <div className="g-label" style={{ color: "#F87171" }}>Needs Attention ({lowPerformers.length})</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {lowPerformers.slice(0, 8).map(member => (
+                  <div key={member.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(255,255,255,0.02)", borderRadius: "var(--r-sm)", border: "1px solid rgba(248,113,113,0.12)" }}>
+                    <div style={{ width: 24, height: 24, borderRadius: 6, background: `${member.color}18`, border: `1px solid ${member.color}28`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: member.color, flexShrink: 0 }}>
+                      {member.initials}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{member.name.split(" ")[0]}</div>
+                      <div style={{ fontSize: 8, color: "var(--text-3)" }}>{member.leadCount} leads · 0 progress</div>
+                    </div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#F87171", flexShrink: 0 }}>No XP</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 10, lineHeight: 1.5 }}>
+                These members have assigned leads but no progress yet.
               </div>
             </motion.div>
           )}

@@ -431,6 +431,7 @@ export default function LeadsPage() {
   const [categoryFilter, setCategoryFilter] = useState<Category | "All">("All")
   const [selected,       setSelected]       = useState<Lead | null>(null)
   const [viewMode,       setViewMode]       = useState<"table" | "kanban">("table")
+  const [myLeadsOnly,    setMyLeadsOnly]    = useState(false)
   const [showImport,     setShowImport]     = useState(false)
   const [showAddForm,    setShowAddForm]    = useState(false)
   const [importFlash,    setImportFlash]    = useState("")
@@ -463,9 +464,10 @@ export default function LeadsPage() {
       const matchSearch = !search || [l.company, l.poc_name, l.poc_email, l.category, l.notes].some(f => f.toLowerCase().includes(search.toLowerCase()))
       const matchStatus = statusFilter === "all" || l.status === statusFilter
       const matchCat    = categoryFilter === "All" || l.category === categoryFilter
-      return matchSearch && matchStatus && matchCat
+      const matchMine   = !myLeadsOnly || l.assigned_to === currentUser?.id
+      return matchSearch && matchStatus && matchCat && matchMine
     })
-  }, [leads, search, statusFilter, categoryFilter])
+  }, [leads, search, statusFilter, categoryFilter, myLeadsOnly, currentUser])
 
   function resolvedDealValue() {
     if (form.deal_preset === -1) return parseInt(form.deal_custom) || 0
@@ -607,6 +609,15 @@ export default function LeadsPage() {
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+
+        {currentUser && currentUser.role !== "team" && (
+          <button
+            onClick={() => setMyLeadsOnly(v => !v)}
+            className={myLeadsOnly ? "btn-gold" : "btn-ghost"}
+            style={{ padding: "7px 14px", fontSize: 11, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+            {myLeadsOnly ? "My Leads" : "All Leads"}
+          </button>
+        )}
 
         <div style={{ display: "flex", background: "rgba(0,0,0,0.25)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-sm)", overflow: "hidden" }}>
           {(["table","kanban"] as const).map(m => (

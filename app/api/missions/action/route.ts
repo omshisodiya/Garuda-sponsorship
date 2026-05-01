@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getSessionFromCookies } from "@/app/lib/server/auth"
 import {
   claimMission, completeMission, verifyMission, rejectMission,
-  getClaimForVerification,
+  getClaimForVerification, withdrawClaim,
 } from "@/app/lib/server/missionStore"
 import { addAudit } from "@/app/lib/server/store"
 
 type ActionBody = {
-  action:          "claim" | "complete" | "verify" | "reject"
+  action:          "claim" | "complete" | "verify" | "reject" | "withdraw"
   missionId:       string
   missionTitle?:   string
   missionPoints?:  number
@@ -29,6 +29,14 @@ export async function POST(req: NextRequest) {
   const { action, missionId } = body
   if (!action || !missionId) {
     return NextResponse.json({ error: "action and missionId required" }, { status: 400 })
+  }
+
+  // ── Withdraw ──────────────────────────────────────────────────────────────
+  if (action === "withdraw") {
+    const ok = await withdrawClaim(missionId, session.sub)
+    if (!ok) return NextResponse.json({ error: "No active claim to withdraw" }, { status: 404 })
+    addAudit({ actor_id: session.sub, actor_name: session.name, action: "mission_withdrawn", target_id: missionId, detail: `Withdrew claim on mission ${missionId}` })
+    return NextResponse.json({ ok: true })
   }
 
   // ── Claim ─────────────────────────────────────────────────────────────────

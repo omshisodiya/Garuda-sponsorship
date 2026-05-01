@@ -140,6 +140,16 @@ export async function getClaimForVerification(missionId: string, userId: string)
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
+export async function withdrawClaim(missionId: string, userId: string): Promise<boolean> {
+  await ensureInit()
+  const rows = await db()`
+    DELETE FROM garuda_mission_claims
+    WHERE mission_id = ${missionId} AND user_id = ${userId} AND status = 'claimed'
+    RETURNING id
+  `
+  return rows.length > 0
+}
+
 export async function claimMission(args: {
   missionId:       string
   missionTitle:    string

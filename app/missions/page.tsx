@@ -122,6 +122,42 @@ function generateMissions(leads: Lead[]): Mission[] {
     desc: "Collect testimonials or intent letters from 2 confirmed sponsors to strengthen outreach.",
     target: "2 testimonials", deadline: "May 8, 2026", points: 120, category: "special" })
 
+  // Always-available outreach missions
+  missions.push({ id: "m_cold_outreach", title: "Cold Outreach Drive",
+    desc: "Pick 5 untouched leads from the vault, make first contact, and update their status to Contacted.",
+    target: "5 leads contacted", deadline: "May 10, 2026", points: 200, category: "outreach" })
+
+  missions.push({ id: "m_pipeline_surge", title: "Pipeline Surge",
+    desc: "Qualify any 3 leads — move them from Prospect to Qualified by sending company research and an initial pitch.",
+    target: "3 leads qualified", deadline: "May 13, 2026", points: 250, category: "pipeline" })
+
+  missions.push({ id: "m_get_to_table", title: "Get to the Table",
+    desc: "Move 3 leads into active discussion. Schedule calls, send decks — open a real conversation.",
+    target: "3 leads in discussion", deadline: "May 14, 2026", points: 300, category: "deal" })
+
+  missions.push({ id: "m_stale_rescue", title: "Stale Lead Rescue",
+    desc: "Re-engage 3 leads with no recent activity. Follow up, update their status, and log progress.",
+    target: "3 stale leads re-engaged", deadline: "May 11, 2026", points: 175, category: "outreach" })
+
+  // Category-specific if not confirmed
+  const noFinance = !leads.some(l => l.category === "Finance" && l.status === "confirmed")
+  if (noFinance)
+    missions.push({ id: "m_finance", title: "Finance Sector Lock",
+      desc: "No Finance brand confirmed yet. Banks and fintech brands are prime candidates for student events.",
+      target: "1 Finance confirmed", deadline: "May 13, 2026", points: 320, category: "deal" })
+
+  const noSports = !leads.some(l => l.category === "Sports" && l.status === "confirmed")
+  if (noSports)
+    missions.push({ id: "m_sports", title: "Sports Brand Push",
+      desc: "No Sports sponsor yet — energy drinks, fitness gear, and sports apparel brands align perfectly with Dandiya Night's high-energy theme.",
+      target: "1 Sports confirmed", deadline: "May 14, 2026", points: 280, category: "deal" })
+
+  const noFnB = !leads.some(l => l.category === "F&B" && l.status === "confirmed")
+  if (noFnB)
+    missions.push({ id: "m_fnb", title: "Food & Beverage Deal",
+      desc: "No F&B brand on board. F&B sponsors are crowd favourites at events — push for at least one.",
+      target: "1 F&B confirmed", deadline: "May 12, 2026", points: 260, category: "deal" })
+
   return missions
 }
 
@@ -147,13 +183,14 @@ function xpTier(xp: number): { label: string; color: string } {
 
 // ── MissionCard ────────────────────────────────────────────────────────────────
 function MissionCard({
-  mission, claim, currentUser, onClaim, onComplete,
+  mission, claim, currentUser, onClaim, onComplete, onWithdraw,
 }: {
   mission:     Mission
   claim:       ApiClaim | null
   currentUser: CurrentUser | null
   onClaim:     (m: Mission) => Promise<void>
   onComplete:  (missionId: string) => Promise<void>
+  onWithdraw:  (missionId: string) => Promise<void>
 }) {
   const [busy, setBusy] = useState(false)
   const catColor = CAT_COLORS[mission.category]
@@ -212,12 +249,22 @@ function MissionCard({
           </motion.button>
         )}
         {isClaimed && (
-          <motion.button whileTap={{ scale: 0.96 }}
-            onClick={async () => { setBusy(true); await onComplete(mission.id); setBusy(false) }}
-            disabled={busy}
-            className="btn-ghost" style={{ marginLeft: "auto", padding: "6px 14px", fontSize: 10 }}>
-            {busy ? "…" : wasRejected ? "Resubmit Complete" : "Mark Complete"}
-          </motion.button>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+            <motion.button whileTap={{ scale: 0.96 }}
+              onClick={async () => { setBusy(true); await onComplete(mission.id); setBusy(false) }}
+              disabled={busy}
+              className="btn-ghost" style={{ padding: "6px 14px", fontSize: 10 }}>
+              {busy ? "…" : wasRejected ? "Resubmit" : "Mark Complete"}
+            </motion.button>
+            {!wasRejected && (
+              <motion.button whileTap={{ scale: 0.96 }}
+                onClick={async () => { setBusy(true); await onWithdraw(mission.id); setBusy(false) }}
+                disabled={busy}
+                style={{ padding: "6px 10px", fontSize: 10, background: "transparent", border: "1px solid rgba(248,113,113,0.2)", color: "#F87171", borderRadius: "var(--r-sm)", cursor: "pointer" }}>
+                Withdraw
+              </motion.button>
+            )}
+          </div>
         )}
         {isComplete && (
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--info)", fontWeight: 700 }}>
@@ -483,6 +530,14 @@ export default function MissionsPage() {
     await refresh()
   }
 
+  async function handleWithdraw(missionId: string) {
+    await fetch("/api/missions/action", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "withdraw", missionId }),
+    })
+    await refresh()
+  }
+
   async function handleReject(missionId: string, targetUserId: string, reason: string) {
     await fetch("/api/missions/action", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -598,7 +653,7 @@ export default function MissionsPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {inProgressMissions.map(({ mission, claim }) => (
                     <MissionCard key={mission.id} mission={mission} claim={claim}
-                      currentUser={currentUser} onClaim={handleClaim} onComplete={handleComplete} />
+                      currentUser={currentUser} onClaim={handleClaim} onComplete={handleComplete} onWithdraw={handleWithdraw} />
                   ))}
                 </div>
               </motion.div>
@@ -610,7 +665,7 @@ export default function MissionsPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {awaitingMissions.map(({ mission, claim }) => (
                     <MissionCard key={mission.id} mission={mission} claim={claim}
-                      currentUser={currentUser} onClaim={handleClaim} onComplete={handleComplete} />
+                      currentUser={currentUser} onClaim={handleClaim} onComplete={handleComplete} onWithdraw={handleWithdraw} />
                   ))}
                 </div>
               </motion.div>
@@ -622,7 +677,7 @@ export default function MissionsPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {openMissions.map(({ mission }) => (
                     <MissionCard key={mission.id} mission={mission} claim={null}
-                      currentUser={currentUser} onClaim={handleClaim} onComplete={handleComplete} />
+                      currentUser={currentUser} onClaim={handleClaim} onComplete={handleComplete} onWithdraw={handleWithdraw} />
                   ))}
                 </div>
               </motion.div>

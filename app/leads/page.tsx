@@ -611,12 +611,17 @@ export default function LeadsPage() {
         </div>
 
         {currentUser && currentUser.role !== "team" && (
-          <button
-            onClick={() => setMyLeadsOnly(v => !v)}
-            className={myLeadsOnly ? "btn-gold" : "btn-ghost"}
-            style={{ padding: "7px 14px", fontSize: 11, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-            {myLeadsOnly ? "My Leads" : "All Leads"}
-          </button>
+          <div style={{ display: "flex", background: "rgba(0,0,0,0.25)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-sm)", overflow: "hidden", flexShrink: 0 }}>
+            {(["all","mine"] as const).map(v => (
+              <button key={v} onClick={() => setMyLeadsOnly(v === "mine")}
+                style={{ padding: "7px 14px", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer",
+                  background: (v === "mine") === myLeadsOnly ? "rgba(201,162,75,0.15)" : "transparent",
+                  color: (v === "mine") === myLeadsOnly ? "#C9A24B" : "var(--text-3)",
+                  transition: "all 0.15s" }}>
+                {v === "mine" ? "My Leads" : "All Leads"}
+              </button>
+            ))}
+          </div>
         )}
 
         <div style={{ display: "flex", background: "rgba(0,0,0,0.25)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-sm)", overflow: "hidden" }}>

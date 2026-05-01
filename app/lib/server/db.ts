@@ -1,8 +1,11 @@
 import { neon } from "@neondatabase/serverless"
 
-let _client: ReturnType<typeof neon> | null = null
+export type Row = Record<string, unknown>
+export type SqlFn = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Row[]>
 
-export function db() {
+let _client: SqlFn | null = null
+
+export function db(): SqlFn {
   if (!_client) {
     const url = process.env.DATABASE_URL
     if (!url) {
@@ -14,7 +17,9 @@ export function db() {
         "4. Add the same variable in Vercel → Project → Settings → Environment Variables"
       )
     }
-    _client = neon(url)
+    // Cast to a simple typed function — avoids the any[][]|Record[]|FullQueryResults union
+    // that TypeScript can't index into directly.
+    _client = neon(url) as unknown as SqlFn
   }
   return _client
 }

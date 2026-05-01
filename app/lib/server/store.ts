@@ -1,4 +1,4 @@
-import { db } from "./db"
+import { db, type Row } from "./db"
 import { hashPassword } from "./auth"
 
 export type UserRole   = "superadmin" | "admin" | "team"
@@ -65,7 +65,7 @@ async function _init(): Promise<void> {
   `
 
   const countRows = await sql`SELECT COUNT(*)::int AS count FROM garuda_users`
-  const count = (countRows as Array<{ count: number }>)[0]?.count ?? 0
+  const count = (countRows[0]?.count as number) ?? 0
   if (count === 0) {
     await _seed()
   }
@@ -187,7 +187,7 @@ function rowToUser(row: Record<string, unknown>): User {
 export async function getUserById(id: string): Promise<User | null> {
   await ensureInit()
   const rows = await db()`SELECT * FROM garuda_users WHERE id = ${id}`
-  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+  return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
@@ -195,13 +195,13 @@ export async function getUserByUsername(username: string): Promise<User | null> 
   const rows = await db()`
     SELECT * FROM garuda_users WHERE lower(username) = lower(${username})
   `
-  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+  return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
 export async function getAllUsers(): Promise<User[]> {
   await ensureInit()
   const rows = await db()`SELECT * FROM garuda_users ORDER BY created_at ASC`
-  return rows.map(r => rowToUser(r as Record<string, unknown>))
+  return rows.map(r => rowToUser(r as Row))
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ export async function createUser(input: CreateUserInput): Promise<User> {
        'active', ${password_hash}, ${input.created_by}, ${now}, TRUE)
     RETURNING *
   `
-  return rowToUser(rows[0] as Record<string, unknown>)
+  return rowToUser(rows[0] as Row)
 }
 
 export async function updateUserStatus(id: string, status: UserStatus): Promise<User | null> {
@@ -240,7 +240,7 @@ export async function updateUserStatus(id: string, status: UserStatus): Promise<
   const rows = await db()`
     UPDATE garuda_users SET status = ${status} WHERE id = ${id} RETURNING *
   `
-  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+  return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
 export async function updateUserRole(id: string, role: UserRole): Promise<User | null> {
@@ -248,7 +248,7 @@ export async function updateUserRole(id: string, role: UserRole): Promise<User |
   const rows = await db()`
     UPDATE garuda_users SET role = ${role} WHERE id = ${id} RETURNING *
   `
-  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+  return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
 export async function resetPassword(id: string, newPassword: string): Promise<User | null> {
@@ -260,7 +260,7 @@ export async function resetPassword(id: string, newPassword: string): Promise<Us
     WHERE id = ${id}
     RETURNING *
   `
-  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+  return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
 export async function changePassword(id: string, newPassword: string): Promise<User | null> {
@@ -272,7 +272,7 @@ export async function changePassword(id: string, newPassword: string): Promise<U
     WHERE id = ${id}
     RETURNING *
   `
-  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+  return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
 export async function deleteUser(id: string): Promise<boolean> {
@@ -286,7 +286,7 @@ export async function updateUsername(id: string, username: string): Promise<User
   const rows = await db()`
     UPDATE garuda_users SET username = ${username} WHERE id = ${id} RETURNING *
   `
-  return rows[0] ? rowToUser(rows[0] as Record<string, unknown>) : null
+  return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
 // ── Audit ─────────────────────────────────────────────────────────────────────

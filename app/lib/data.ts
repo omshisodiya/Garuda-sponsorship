@@ -96,13 +96,14 @@ export type Lead = {
   category: Category
   status: LeadStatus
   stage: LeadStage
-  assigned_to: TeamMemberId | null
+  assigned_to: string | null
   deal_value: number    // in rupees
   probability: number   // 0-100
   notes: string
   last_activity: string // ISO date
   created_at: string
-  created_by: TeamMemberId
+  created_by: string
+  screenshots?: Record<string, string>
 }
 
 export const LEADS: Lead[] = []

@@ -4,19 +4,54 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Search, Upload, Plus, X, Mail, Phone, ChevronRight,
-  LayoutGrid, List, SlidersHorizontal, Download, Loader,
+  LayoutGrid, List, SlidersHorizontal, Download, Loader, Camera, Save,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
-  TEAM, CATEGORIES, TIERS, type Lead, type LeadStatus, type LeadStage, type Category, type TeamMemberId,
+  CATEGORIES, TIERS, type Lead, type LeadStatus, type LeadStage, type Category,
 } from "../lib/data"
 
+// ── DisplayUser helpers ──────────────────────────────────────────────────────
+type DisplayUser = {
+  id: string
+  name: string
+  role: "superadmin" | "admin" | "team"
+  color: string
+  initials: string
+}
+
+const PALETTE = [
+  "#60A5FA","#A78BFA","#4ADE80","#F472B6","#FB923C","#34D399","#F87171",
+  "#818CF8","#FBBF24","#22D3EE","#E879F9","#6EE7B7","#FCA5A5","#93C5FD",
+  "#FDE68A","#DDD6FE","#67E8F9","#FCD34D","#C9A24B","#FBBF24",
+]
+
+function userColor(id: string): string {
+  const h = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
+  return PALETTE[h % PALETTE.length]
+}
+
+function userInitials(name: string): string {
+  return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("")
+}
+
+function toDisplayUser(u: { id: string; name: string; role: string }): DisplayUser {
+  return {
+    id: u.id,
+    name: u.name,
+    role: u.role as DisplayUser["role"],
+    color: userColor(u.id),
+    initials: userInitials(u.name),
+  }
+}
+
+// ── Deal options ─────────────────────────────────────────────────────────────
 const DEAL_OPTIONS = [
-  { label: "Partner Sponsor — ₹75,000",  value: 75000  },
-  { label: "Co Sponsor — ₹95,000",       value: 95000  },
-  { label: "Title Sponsor — ₹1,50,000",  value: 150000 },
-  { label: "In-kind (₹0)",               value: 0      },
-  { label: "Other (custom amount)",       value: -1     },
+  { label: "Partner Sponsor — ₹75,000", value: 75000  },
+  { label: "Co Sponsor — ₹95,000",      value: 95000  },
+  { label: "Title Sponsor — ₹1,50,000", value: 150000 },
+  { label: "In-kind (₹0)",              value: 0      },
+  { label: "Other (custom amount)",      value: -1     },
 ]
 
 const STATUS_COLORS: Record<LeadStatus, string> = {
@@ -39,28 +74,30 @@ const STAGE_COLORS: Record<LeadStage, string> = {
 const STATUS_OPTIONS: LeadStatus[] = ["not_started","contacted","in_discussion","confirmed","rejected"]
 const ALL_STATUSES: Array<LeadStatus | "all"> = ["all", ...STATUS_OPTIONS]
 
-function getTeamName(id: string | null) {
+function getUserName(users: DisplayUser[], id: string | null) {
   if (!id) return "Unassigned"
-  return TEAM.find(m => m.id === id)?.name || "—"
+  return users.find(m => m.id === id)?.name || "—"
 }
 
-function getTeamColor(id: string | null) {
+function getUserColor(users: DisplayUser[], id: string | null) {
   if (!id) return "var(--text-3)"
-  return TEAM.find(m => m.id === id)?.color || "var(--text-3)"
+  return users.find(m => m.id === id)?.color || "var(--text-3)"
 }
 
-function exportPerMember(leads: Lead[]) {
+// ── Export (Blob approach — reliable in Next.js) ──────────────────────────────
+function exportPerMember(leads: Lead[], users: DisplayUser[]) {
   const wb = XLSX.utils.book_new()
 
+  const nonSuperadmin = users.filter(u => u.role !== "superadmin")
+
   // Summary sheet
-  const summaryRows = TEAM.filter(m => m.tier !== "superadmin").map(m => {
-    const myLeads = leads.filter(l => l.assigned_to === m.id)
+  const summaryRows = nonSuperadmin.map(m => {
+    const myLeads   = leads.filter(l => l.assigned_to === m.id)
     const confirmed = myLeads.filter(l => l.status === "confirmed")
     const contacted = myLeads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status))
     return {
       "Name":             m.name,
       "Role":             m.role,
-      "Tier":             m.tier,
       "Total Leads":      myLeads.length,
       "Contacted":        contacted.length,
       "In Discussion":    myLeads.filter(l => l.status === "in_discussion").length,
@@ -73,7 +110,7 @@ function exportPerMember(leads: Lead[]) {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Team Summary")
 
   // Per-member sheets (top 10 active members)
-  const activeMembers = TEAM.filter(m => m.tier !== "superadmin").filter(m => leads.some(l => l.assigned_to === m.id))
+  const activeMembers = nonSuperadmin.filter(m => leads.some(l => l.assigned_to === m.id))
   for (const m of activeMembers.slice(0, 10)) {
     const myLeads = leads.filter(l => l.assigned_to === m.id).map(l => ({
       "Company":        l.company,
@@ -101,7 +138,7 @@ function exportPerMember(leads: Lead[]) {
     "Category":     l.category,
     "Status":       l.status.replace(/_/g, " "),
     "Stage":        l.stage,
-    "Assigned To":  getTeamName(l.assigned_to),
+    "Assigned To":  getUserName(users, l.assigned_to),
     "Deal Value":   l.deal_value,
     "Probability %":l.probability,
     "Last Activity":l.last_activity,
@@ -109,38 +146,316 @@ function exportPerMember(leads: Lead[]) {
   }))
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allRows), "All Leads")
 
-  XLSX.writeFile(wb, `Garuda_Sponsorship_Report_${new Date().toISOString().split("T")[0]}.xlsx`)
+  // Blob + anchor approach (reliable in Next.js / browsers)
+  const buf  = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
+  a.download = `Garuda_Sponsorship_Report_${new Date().toISOString().split("T")[0]}.xlsx`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
+// ── Detail slide-over ─────────────────────────────────────────────────────────
+function DetailPanel({
+  lead,
+  users,
+  currentUser,
+  onClose,
+  onUpdate,
+}: {
+  lead: Lead
+  users: DisplayUser[]
+  currentUser: { id: string; role: string } | null
+  onClose: () => void
+  onUpdate: (updated: Lead) => void
+}) {
+  const [editStatus,     setEditStatus]     = useState<LeadStatus>(lead.status)
+  const [dealPreset,     setDealPreset]     = useState<number>(
+    DEAL_OPTIONS.find(o => o.value === lead.deal_value) ? lead.deal_value : -1
+  )
+  const [dealCustom,     setDealCustom]     = useState<string>(
+    DEAL_OPTIONS.find(o => o.value === lead.deal_value) ? "" : String(lead.deal_value)
+  )
+  const [saving,         setSaving]         = useState(false)
+  const [flash,          setFlash]          = useState("")
+  const screenshotRef = useRef<HTMLInputElement>(null)
+
+  // Determine if current user can edit this lead
+  const canEdit = currentUser
+    ? currentUser.role === "superadmin" || currentUser.role === "admin" ||
+      (currentUser.role === "team" && lead.assigned_to === currentUser.id)
+    : false
+
+  const resolvedDealValue = dealPreset === -1
+    ? (parseInt(dealCustom) || 0)
+    : dealPreset
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          status:     editStatus,
+          deal_value: resolvedDealValue,
+        }),
+      })
+      if (res.ok) {
+        const { lead: updated } = await res.json()
+        onUpdate(updated)
+        setFlash("Saved!")
+        setTimeout(() => setFlash(""), 2000)
+      } else {
+        setFlash("Save failed")
+        setTimeout(() => setFlash(""), 2000)
+      }
+    } catch {
+      setFlash("Save failed")
+      setTimeout(() => setFlash(""), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleScreenshotChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async ev => {
+      const base64 = ev.target?.result as string
+      const statusKey = editStatus
+      const screenshots = { ...(lead.screenshots ?? {}), [statusKey]: base64 }
+      try {
+        const res = await fetch(`/api/leads/${lead.id}`, {
+          method:  "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ screenshots }),
+        })
+        if (res.ok) {
+          const { lead: updated } = await res.json()
+          onUpdate(updated)
+          setFlash("Screenshot uploaded!")
+          setTimeout(() => setFlash(""), 2500)
+        }
+      } catch { /* silent */ }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const screenshots = lead.screenshots ?? {}
+  const screenshotEntries = Object.entries(screenshots)
+
+  return (
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9990 }}
+        onClick={onClose} />
+      <motion.div
+        initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 420, background: "var(--bg-1)", borderLeft: "1px solid var(--brand-edge)", zIndex: 9991, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-1)" }}>{lead.company}</div>
+            <span className={`badge ${STATUS_COLORS[lead.status]}`} style={{ fontSize: 9, marginTop: 6, display: "inline-flex" }}>
+              {lead.status.replace(/_/g, " ")}
+            </span>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer" }}><X size={18} /></button>
+        </div>
+
+        {/* Editable Status */}
+        {canEdit && (
+          <div>
+            <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Status</label>
+            <select className="g-select" style={{ width: "100%" }} value={editStatus}
+              onChange={e => setEditStatus(e.target.value as LeadStatus)}>
+              {STATUS_OPTIONS.map(s => (
+                <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Editable Deal Value */}
+        {canEdit && (
+          <div>
+            <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Deal Value / Tier</label>
+            <select className="g-select" style={{ width: "100%" }} value={dealPreset}
+              onChange={e => setDealPreset(parseInt(e.target.value))}>
+              {DEAL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {dealPreset === -1 && (
+              <input className="g-input" style={{ marginTop: 6 }} value={dealCustom}
+                onChange={e => setDealCustom(e.target.value)}
+                placeholder="Custom amount (₹)" type="number" min="0" />
+            )}
+            {dealPreset !== -1 && (
+              <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(201,162,75,0.06)", border: "1px solid rgba(201,162,75,0.15)", borderRadius: "var(--r-sm)", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 10, color: "var(--text-3)" }}>
+                  {TIERS.find(t => t.price === dealPreset)?.name ?? (dealPreset === 0 ? "In-kind" : "Custom")}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#C9A24B" }}>
+                  {dealPreset === 0 ? "In-kind" : `₹${dealPreset.toLocaleString("en-IN")}`}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Static info grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[
+            { label: "Deal Value",   value: lead.deal_value === 0 ? "In-kind" : `₹${lead.deal_value.toLocaleString("en-IN")}` },
+            { label: "Tier",         value: lead.deal_value >= 150000 ? "Title Sponsor" : lead.deal_value >= 95000 ? "Co Sponsor" : lead.deal_value >= 75000 ? "Partner Sponsor" : lead.deal_value === 0 ? "In-kind" : "Custom" },
+            { label: "Probability",  value: `${lead.probability}%` },
+            { label: "Category",     value: lead.category },
+            { label: "Stage",        value: lead.stage },
+            { label: "Assigned To",  value: getUserName(users, lead.assigned_to) },
+            { label: "Last Activity",value: lead.last_activity },
+          ].map(r => (
+            <div key={r.label} style={{ padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: "var(--r-md)", border: "1px solid var(--brand-edge)" }}>
+              <div style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{r.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{r.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="g-divider" style={{ margin: "4px 0" }} />
+
+        {/* Contact */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            <div className="g-label" style={{ marginBottom: 5 }}>Point of Contact</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>{lead.poc_name}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Mail size={13} color="var(--text-3)" />
+            <span style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.poc_email}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Phone size={13} color="var(--text-3)" />
+            <span style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.poc_phone}</span>
+          </div>
+        </div>
+
+        {lead.notes && (
+          <>
+            <div className="g-divider" style={{ margin: "4px 0" }} />
+            <div>
+              <div className="g-label" style={{ marginBottom: 6 }}>Notes</div>
+              <div style={{ fontSize: 12, color: "var(--text-2)", lineHeight: 1.7, padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: "var(--r-md)", border: "1px solid var(--brand-edge)" }}>{lead.notes}</div>
+            </div>
+          </>
+        )}
+
+        {/* Screenshot section */}
+        <div className="g-divider" style={{ margin: "4px 0" }} />
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div className="g-label">Screenshot Proof</div>
+            {canEdit && (
+              <>
+                <button className="btn-ghost" style={{ padding: "5px 10px", fontSize: 10 }}
+                  onClick={() => screenshotRef.current?.click()}>
+                  <Camera size={11} /> Upload
+                </button>
+                <input ref={screenshotRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleScreenshotChange} />
+              </>
+            )}
+          </div>
+
+          {screenshotEntries.length === 0 ? (
+            <div style={{ fontSize: 11, color: "var(--text-3)", textAlign: "center", padding: "16px 0", border: "1px dashed rgba(201,162,75,0.15)", borderRadius: "var(--r-md)" }}>
+              No screenshots yet
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {screenshotEntries.map(([statusKey, dataUrl]) => (
+                <div key={statusKey}>
+                  <div style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>
+                    {statusKey.replace(/_/g, " ")}
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={dataUrl} alt={`Screenshot for ${statusKey}`}
+                    style={{ width: "100%", borderRadius: "var(--r-sm)", border: "1px solid var(--brand-edge)", objectFit: "cover", maxHeight: 200 }} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Flash feedback */}
+        {flash && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ padding: "8px 12px", background: "var(--success-bg)", border: "1px solid var(--success-edge)", borderRadius: "var(--r-sm)", fontSize: 11, color: "var(--success)", fontWeight: 700 }}>
+            {flash}
+          </motion.div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+          {canEdit && (
+            <button className="btn-gold" onClick={handleSave} disabled={saving}
+              style={{ flex: 1, justifyContent: "center", fontSize: 11 }}>
+              <Save size={12} /> {saving ? "Saving…" : "Save Changes"}
+            </button>
+          )}
+          <button className="btn-ghost"
+            onClick={() => window.open(`mailto:${lead.poc_email}?subject=Sponsorship Collaboration | Dandiya Night '26 | Club Garuda&cc=garuda.club@muj.manipal.edu`)}
+            style={{ flex: canEdit ? 0 : 1, justifyContent: "center", fontSize: 11, padding: "11px 14px" }}>
+            <Mail size={12} />
+          </button>
+          <button className="btn-ghost" style={{ padding: "11px 14px" }}><Phone size={13} /></button>
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function LeadsPage() {
-  const [leads, setLeads]           = useState<Lead[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [search, setSearch]         = useState("")
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all")
+  const [leads,          setLeads]          = useState<Lead[]>([])
+  const [users,          setUsers]          = useState<DisplayUser[]>([])
+  const [currentUser,    setCurrentUser]    = useState<{ id: string; role: string } | null>(null)
+  const [loading,        setLoading]        = useState(true)
+  const [search,         setSearch]         = useState("")
+  const [statusFilter,   setStatusFilter]   = useState<LeadStatus | "all">("all")
   const [categoryFilter, setCategoryFilter] = useState<Category | "All">("All")
-  const [selected, setSelected]     = useState<Lead | null>(null)
-  const [viewMode, setViewMode]     = useState<"table" | "kanban">("table")
-  const [showImport, setShowImport] = useState(false)
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [importFlash, setImportFlash] = useState("")
-  const [addingLead, setAddingLead] = useState(false)
+  const [selected,       setSelected]       = useState<Lead | null>(null)
+  const [viewMode,       setViewMode]       = useState<"table" | "kanban">("table")
+  const [showImport,     setShowImport]     = useState(false)
+  const [showAddForm,    setShowAddForm]    = useState(false)
+  const [importFlash,    setImportFlash]    = useState("")
+  const [addingLead,     setAddingLead]     = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // new lead form state
   const [form, setForm] = useState({
     company: "", poc_name: "", poc_email: "", poc_phone: "",
     category: "FMCG" as Category,
-    deal_preset: 75000 as number,   // selected tier value (-1 = custom)
-    deal_custom: "",                // custom amount text
+    deal_preset: 75000 as number,
+    deal_custom: "",
     notes: "",
   })
 
   useEffect(() => {
-    fetch("/api/leads")
-      .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data) setLeads(data.leads ?? []) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    Promise.all([
+      fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/auth/me").then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([leadsData, usersData, meData]) => {
+      if (leadsData) setLeads(leadsData.leads ?? [])
+      if (usersData) setUsers((usersData.users ?? []).map(toDisplayUser))
+      if (meData?.user) setCurrentUser({ id: meData.user.id, role: meData.user.role })
+    }).finally(() => setLoading(false))
   }, [])
 
   const filtered = useMemo(() => {
@@ -179,7 +494,7 @@ export default function LeadsPage() {
           probability:  25,
           notes:        r["Notes"] || "",
           last_activity: today,
-          created_by:   "u1",
+          created_by:   currentUser?.id ?? "u1",
         }))
         const results = await Promise.all(
           payloads.map(p =>
@@ -216,7 +531,7 @@ export default function LeadsPage() {
           category: form.category, status: "not_started", stage: "prospect",
           assigned_to: null, deal_value: resolvedDealValue(),
           probability: 25, notes: form.notes,
-          last_activity: today, created_by: "u1",
+          last_activity: today, created_by: currentUser?.id ?? "u1",
         }),
       })
       if (res.ok) {
@@ -228,6 +543,11 @@ export default function LeadsPage() {
     }
     setForm({ company: "", poc_name: "", poc_email: "", poc_phone: "", category: "FMCG", deal_preset: 75000, deal_custom: "", notes: "" })
     setShowAddForm(false)
+  }
+
+  function handleLeadUpdate(updated: Lead) {
+    setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))
+    setSelected(updated)
   }
 
   const kanbanStages: LeadStage[] = ["prospect", "qualified", "proposal", "negotiation", "won", "lost"]
@@ -255,7 +575,7 @@ export default function LeadsPage() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn-ghost" onClick={() => setShowImport(true)} style={{ fontSize: 11 }}><Upload size={13} /> Import Excel</button>
-          <button className="btn-ghost" onClick={() => exportPerMember(leads)} style={{ fontSize: 11 }}><Download size={13} /> Export Report</button>
+          <button className="btn-ghost" onClick={() => exportPerMember(leads, users)} style={{ fontSize: 11 }}><Download size={13} /> Export Report</button>
           <button className="btn-gold" onClick={() => setShowAddForm(true)} style={{ fontSize: 11 }}><Plus size={13} /> Add Lead</button>
         </div>
       </motion.div>
@@ -331,10 +651,12 @@ export default function LeadsPage() {
                     <td>
                       {lead.assigned_to ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ width: 20, height: 20, borderRadius: 5, background: `${getTeamColor(lead.assigned_to)}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: getTeamColor(lead.assigned_to) }}>
-                            {TEAM.find(m => m.id === lead.assigned_to)?.initials}
+                          <div style={{ width: 20, height: 20, borderRadius: 5, background: `${getUserColor(users, lead.assigned_to)}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: getUserColor(users, lead.assigned_to) }}>
+                            {users.find(m => m.id === lead.assigned_to)?.initials ?? "?"}
                           </div>
-                          <span style={{ fontSize: 11, color: getTeamColor(lead.assigned_to), fontWeight: 600 }}>{TEAM.find(m => m.id === lead.assigned_to)?.name.split(" ")[0]}</span>
+                          <span style={{ fontSize: 11, color: getUserColor(users, lead.assigned_to), fontWeight: 600 }}>
+                            {users.find(m => m.id === lead.assigned_to)?.name.split(" ")[0] ?? lead.assigned_to}
+                          </span>
                         </div>
                       ) : <span style={{ fontSize: 11, color: "var(--text-3)" }}>Unassigned</span>}
                     </td>
@@ -417,74 +739,14 @@ export default function LeadsPage() {
       {/* Detail slide-over */}
       <AnimatePresence>
         {selected && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9990 }}
-              onClick={() => setSelected(null)} />
-            <motion.div
-              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 400, background: "var(--bg-1)", borderLeft: "1px solid var(--brand-edge)", zIndex: 9991, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-1)" }}>{selected.company}</div>
-                  <span className={`badge ${STATUS_COLORS[selected.status]}`} style={{ fontSize: 9, marginTop: 6, display: "inline-flex" }}>{selected.status.replace("_"," ")}</span>
-                </div>
-                <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer" }}><X size={18} /></button>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {[
-                  { label: "Deal Value",   value: selected.deal_value === 0 ? "In-kind" : `₹${selected.deal_value.toLocaleString("en-IN")}` },
-                  { label: "Tier",         value: selected.deal_value >= 150000 ? "Title Sponsor" : selected.deal_value >= 95000 ? "Co Sponsor" : selected.deal_value >= 75000 ? "Partner Sponsor" : selected.deal_value === 0 ? "In-kind" : "Custom" },
-                  { label: "Probability",  value: `${selected.probability}%` },
-                  { label: "Category",     value: selected.category },
-                  { label: "Stage",        value: selected.stage },
-                  { label: "Assigned To",  value: getTeamName(selected.assigned_to) },
-                  { label: "Last Activity",value: selected.last_activity },
-                ].map(r => (
-                  <div key={r.label} style={{ padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: "var(--r-md)", border: "1px solid var(--brand-edge)" }}>
-                    <div style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{r.label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{r.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="g-divider" style={{ margin: "4px 0" }} />
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div>
-                  <div className="g-label" style={{ marginBottom: 5 }}>Point of Contact</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>{selected.poc_name}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Mail size={13} color="var(--text-3)" />
-                  <span style={{ fontSize: 12, color: "var(--text-2)" }}>{selected.poc_email}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Phone size={13} color="var(--text-3)" />
-                  <span style={{ fontSize: 12, color: "var(--text-2)" }}>{selected.poc_phone}</span>
-                </div>
-              </div>
-
-              {selected.notes && (
-                <>
-                  <div className="g-divider" style={{ margin: "4px 0" }} />
-                  <div>
-                    <div className="g-label" style={{ marginBottom: 6 }}>Notes</div>
-                    <div style={{ fontSize: 12, color: "var(--text-2)", lineHeight: 1.7, padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: "var(--r-md)", border: "1px solid var(--brand-edge)" }}>{selected.notes}</div>
-                  </div>
-                </>
-              )}
-
-              <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-                <button className="btn-gold" onClick={() => window.open(`mailto:${selected.poc_email}?subject=Sponsorship Collaboration | Dandiya Night '26 | Club Garuda&cc=garuda.club@muj.manipal.edu`)} style={{ flex: 1, justifyContent: "center", fontSize: 11 }}>
-                  <Mail size={12} /> Email via Gmail
-                </button>
-                <button className="btn-ghost" style={{ padding: "11px 14px" }}><Phone size={13} /></button>
-              </div>
-            </motion.div>
-          </>
+          <DetailPanel
+            key={selected.id}
+            lead={selected}
+            users={users}
+            currentUser={currentUser}
+            onClose={() => setSelected(null)}
+            onUpdate={handleLeadUpdate}
+          />
         )}
       </AnimatePresence>
 
@@ -522,7 +784,6 @@ export default function LeadsPage() {
                   </select>
                 </div>
 
-                {/* Custom amount field (only when "Other" selected) */}
                 {form.deal_preset === -1 && (
                   <div>
                     <label style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", display: "block", marginBottom: 5 }}>Custom Amount (₹)</label>
@@ -530,7 +791,6 @@ export default function LeadsPage() {
                   </div>
                 )}
 
-                {/* Tier preview */}
                 {form.deal_preset !== -1 && (
                   <div style={{ padding: "8px 12px", background: "rgba(201,162,75,0.06)", border: "1px solid rgba(201,162,75,0.15)", borderRadius: "var(--r-sm)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 10, color: "var(--text-3)" }}>

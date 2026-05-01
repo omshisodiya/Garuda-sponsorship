@@ -129,6 +129,16 @@ export async function getAllUsersXP(): Promise<Record<string, number>> {
   return out
 }
 
+export async function getClaimForVerification(missionId: string, userId: string): Promise<MissionClaim | null> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT * FROM garuda_mission_claims
+    WHERE mission_id = ${missionId} AND user_id = ${userId} AND status = 'complete'
+    LIMIT 1
+  `
+  return rows[0] ? rowToClaim(rows[0] as Row) : null
+}
+
 // ── Write ─────────────────────────────────────────────────────────────────────
 export async function claimMission(args: {
   missionId:       string

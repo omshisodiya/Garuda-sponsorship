@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getSessionFromCookies } from "@/app/lib/server/auth"
 import {
   claimMission, completeMission, verifyMission, rejectMission,
+  getClaimForVerification,
 } from "@/app/lib/server/missionStore"
 import { addAudit } from "@/app/lib/server/store"
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ claim })
   }
 
-  // ── Verify (admin/superadmin only) ────────────────────────────────────────
+  // ── Verify (admin → team only; superadmin → anyone) ──────────────────────
   if (action === "verify") {
     if (session.role !== "admin" && session.role !== "superadmin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -67,13 +68,21 @@ export async function POST(req: NextRequest) {
     const targetUserId = body.targetUserId
     if (!targetUserId) return NextResponse.json({ error: "targetUserId required" }, { status: 400 })
 
+    const pending = await getClaimForVerification(missionId, targetUserId)
+    if (!pending) return NextResponse.json({ error: "No pending completion found" }, { status: 404 })
+
+    // Admins may only verify team members; superadmin can verify admin + team
+    if (session.role === "admin" && pending.user_role !== "team") {
+      return NextResponse.json({ error: "Admins can only verify Team member completions. Admin completions require Superadmin approval." }, { status: 403 })
+    }
+
     const claim = await verifyMission(missionId, targetUserId, session.sub, session.name)
-    if (!claim) return NextResponse.json({ error: "No pending completion found" }, { status: 404 })
+    if (!claim) return NextResponse.json({ error: "Verify failed" }, { status: 500 })
     addAudit({ actor_id: session.sub, actor_name: session.name, action: "mission_verified", target_id: missionId, detail: `Verified ${claim.user_name}'s completion of: ${claim.mission_title} (+${claim.mission_points} XP)` })
     return NextResponse.json({ claim })
   }
 
-  // ── Reject (admin/superadmin only) ────────────────────────────────────────
+  // ── Reject (admin → team only; superadmin → anyone) ───────────────────────
   if (action === "reject") {
     if (session.role !== "admin" && session.role !== "superadmin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -81,8 +90,15 @@ export async function POST(req: NextRequest) {
     const targetUserId = body.targetUserId
     if (!targetUserId) return NextResponse.json({ error: "targetUserId required" }, { status: 400 })
 
+    const pending = await getClaimForVerification(missionId, targetUserId)
+    if (!pending) return NextResponse.json({ error: "No pending completion found" }, { status: 404 })
+
+    if (session.role === "admin" && pending.user_role !== "team") {
+      return NextResponse.json({ error: "Admins can only reject Team member completions." }, { status: 403 })
+    }
+
     const claim = await rejectMission(missionId, targetUserId, session.sub, session.name, body.reason ?? "")
-    if (!claim) return NextResponse.json({ error: "No pending completion found" }, { status: 404 })
+    if (!claim) return NextResponse.json({ error: "Reject failed" }, { status: 500 })
     addAudit({ actor_id: session.sub, actor_name: session.name, action: "mission_rejected", target_id: missionId, detail: `Rejected ${claim.user_name}'s completion of: ${claim.mission_title}. Reason: ${body.reason}` })
     return NextResponse.json({ claim })
   }

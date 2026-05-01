@@ -241,6 +241,7 @@ function VerificationPanel({
   const [busy,        setBusy]        = useState<string | null>(null)
   const [rejectState, setRejectState] = useState<{ key: string; reason: string } | null>(null)
 
+  // Superadmin sees all (admin + team); admin sees team only
   const visible = currentUser?.role === "superadmin"
     ? pending
     : pending.filter(c => c.user_role === "team")
@@ -395,6 +396,31 @@ export default function MissionsPage() {
     ? pending.length
     : pending.filter(c => c.user_role === "team").length
 
+  // Category-wise leaderboard
+  const [lbCategory, setLbCategory] = useState<string>("Overall")
+  const leadCategories = useMemo(() => {
+    const cats = [...new Set(leads.map(l => l.category))].sort()
+    return ["Overall", ...cats]
+  }, [leads])
+
+  const categoryLeaderboard = useMemo(() => {
+    const filteredLeads = lbCategory === "Overall"
+      ? leads
+      : leads.filter(l => l.category === lbCategory)
+    return users
+      .filter(u => u.role !== "superadmin")
+      .map(member => {
+        const myLeads   = filteredLeads.filter(l => l.assigned_to === member.id)
+        const leadXp    = myLeads.reduce((s, l) => s + xpForLead(l), 0)
+        const missionXp = lbCategory === "Overall" ? (xpMap[member.id] ?? 0) : 0
+        const xp = leadXp + missionXp
+        const tier = xpTier(xp)
+        return { ...member, xp, leadXp, missionXp, tierLabel: tier.label, tierColor: tier.color, leadCount: myLeads.length }
+      })
+      .filter(m => m.xp > 0 || (lbCategory === "Overall" && m.leadCount > 0))
+      .sort((a, b) => b.xp - a.xp)
+  }, [leads, users, xpMap, lbCategory])
+
   async function handleClaim(mission: Mission) {
     if (!currentUser) return
     await fetch("/api/missions/action", {
@@ -547,17 +573,31 @@ export default function MissionsPage() {
         {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-          {/* Leaderboard */}
+          {/* Leaderboard with category tabs */}
           <motion.div initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="panel">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div className="g-label">XP Leaderboard</div>
               <span style={{ fontSize: 9, color: "var(--text-3)", background: "rgba(201,162,75,0.07)", border: "1px solid rgba(201,162,75,0.15)", padding: "2px 7px", borderRadius: 10 }}>Live</span>
             </div>
-            {leaderboard.length === 0 ? (
-              <div style={{ fontSize: 11, color: "var(--text-3)", textAlign: "center", padding: "16px 0" }}>No XP earned yet</div>
+            {/* Category tabs */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
+              {leadCategories.map(cat => (
+                <button key={cat} onClick={() => setLbCategory(cat)}
+                  style={{ padding: "3px 8px", fontSize: 9, fontWeight: 700, borderRadius: 10, border: "none", cursor: "pointer",
+                    background: lbCategory === cat ? "#C9A24B" : "rgba(255,255,255,0.06)",
+                    color: lbCategory === cat ? "#000" : "var(--text-3)",
+                    transition: "all 0.15s" }}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            {categoryLeaderboard.length === 0 ? (
+              <div style={{ fontSize: 11, color: "var(--text-3)", textAlign: "center", padding: "16px 0" }}>
+                No XP in {lbCategory} yet
+              </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {leaderboard.slice(0, 12).map((member, i) => (
+                {categoryLeaderboard.slice(0, 12).map((member, i) => (
                   <div key={member.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px",
                     background: i === 0 ? "rgba(201,162,75,0.06)" : "rgba(255,255,255,0.02)",
                     borderRadius: "var(--r-sm)", border: `1px solid ${i === 0 ? "rgba(201,162,75,0.18)" : "rgba(255,255,255,0.05)"}` }}>
@@ -570,7 +610,10 @@ export default function MissionsPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{member.name.split(" ")[0]}</div>
                       <div style={{ fontSize: 8, color: member.tierColor, fontWeight: 700 }}>
-                        {member.tierLabel} · {member.leadXp}L+{member.missionXp}M XP
+                        {member.tierLabel}
+                        {lbCategory === "Overall"
+                          ? ` · ${member.leadXp}L+${member.missionXp}M`
+                          : ` · ${member.leadCount} leads`}
                       </div>
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 800, color: member.xp > 0 ? "#C9A24B" : "var(--text-3)", flexShrink: 0 }}>{member.xp}</div>
@@ -607,9 +650,9 @@ export default function MissionsPage() {
                 {currentUser.role === "team" ? "Mission Rules" : "Your Verify Rights"}
               </div>
               <div style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.65 }}>
-                {currentUser.role === "superadmin" && "As Superadmin you can verify any completed mission from any user."}
-                {currentUser.role === "admin" && "As Admin you can verify completed missions claimed by Team members."}
-                {currentUser.role === "team" && "Claim a mission → complete your work → click Mark Complete. An Admin or Superadmin will verify it. After verification, the mission resets so you can claim it again for more XP."}
+                {currentUser.role === "superadmin" && "As Superadmin you can verify any completed mission — from admins and team members alike."}
+                {currentUser.role === "admin" && "As Admin you can verify Team member completions. Your own completed missions require Superadmin approval."}
+                {currentUser.role === "team" && "Claim → do the work → Mark Complete. An Admin or Superadmin will verify. After verification the mission resets so you can claim it again for more XP."}
               </div>
             </motion.div>
           )}

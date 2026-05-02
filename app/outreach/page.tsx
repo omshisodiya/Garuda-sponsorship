@@ -19,8 +19,6 @@ I am writing to present an exclusive high-impact sponsorship opportunity for our
 
 This is not just an event — it is a large-scale cultural production, blending tradition, entertainment, and strategic brand engagement.
 
----
-
 About Garuda Dandiya Night 2026
 
 Garuda Dandiya Night is a grand Navratri celebration built around Garba and Dandiya Raas, live music, immersive decor, and a vibrant youth atmosphere. The event is designed to deliver a premium, festival-like experience with high production quality, structured crowd flow, and engaging zones.
@@ -33,7 +31,6 @@ Key highlights:
 - Performances, competitions, and crowd engagement activities
 - Organized security, entry management, and crowd control system
 
----
 
 Scale and Impact Metrics
 
@@ -53,8 +50,6 @@ Engagement Lifecycle
 - Pre-event hype campaign running 15 to 20 days prior
 - Live event engagement
 - Post-event digital amplification through after-movies and highlights
-
----
 
 Strategic Value for [Company]
 
@@ -81,8 +76,6 @@ Strategic Value for [Company]
 - Contests, giveaways, and registrations
 - Direct audience data capture as per optional integrations
 
----
-
 Sponsorship Structure
 
 Title Sponsor — Rs. 1,50,000 (Exclusive)
@@ -105,8 +98,6 @@ Partner Sponsor — Rs. 75,000
 Associate Sponsor / Zone Sponsor
 Sponsor specific areas such as the Dance Arena, Selfie Booth, Entry Gate, Merchandise Zone, or Competition Prizes with selective visibility packages.
 
----
-
 Unique Branding Opportunities
 
 - Branded Dandiya sticks distributed to all attendees — a high recall item
@@ -116,8 +107,6 @@ Unique Branding Opportunities
 - Live stage integration and host mentions
 - Customized contests powered by [Company]
 
----
-
 Execution Excellence
 
 Club Garuda ensures:
@@ -126,7 +115,6 @@ Club Garuda ensures:
 - Strict security and discipline protocols coordinated with university administration
 - Smooth sponsor coordination for all deliverables with regular updates
 
----
 
 Why Partner with Club Garuda?
 
@@ -135,7 +123,6 @@ Why Partner with Club Garuda?
 - High execution discipline and brand professionalism
 - Focus on long-term partnerships, not one-time sponsorships
 
----
 
 Next Steps
 

@@ -18,7 +18,7 @@ export async function GET() {
   }
 
   const rows = await db()`
-    SELECT id, actor_id, actor_name, action, detail, ts
+    SELECT id, actor_id, actor_name, action, detail, ts::text AS ts
     FROM garuda_audit
     WHERE action IN ('login', 'logout')
     ORDER BY ts ASC

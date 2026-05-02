@@ -803,6 +803,7 @@ export default function SuperAdminDashboard() {
       <AnimatePresence>
         {drill && (
           <LeadDrillPanel
+            key={drill.label}
             label={drill.label}
             leads={drill.leads}
             users={users}

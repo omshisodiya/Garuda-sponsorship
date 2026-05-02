@@ -8,12 +8,12 @@ import { LEADS, TEAM, getStats, ALERTS, SIGNALS, CLUB, TIERS } from "../lib/data
 type Message = { role: "user" | "assistant"; content: string; timestamp: string }
 
 const QUICK = [
-  { label: "What should I do next?",          prompt: "What should I do next based on the current pipeline state?",    icon: Target  },
-  { label: "Draft outreach — Red Bull India", prompt: "Draft an outreach email for Red Bull India sponsorship.",        icon: Mail    },
-  { label: "Pipeline analysis",               prompt: "Analyze the current pipeline and identify the top risks.",       icon: TrendingUp },
-  { label: "Negotiation strategy — boAt",    prompt: "Give me a negotiation strategy for the boAt deal.",             icon: Zap     },
-  { label: "Stalled deal diagnosis",          prompt: "Why might a deal in negotiation stage be stalling?",            icon: Shield  },
-  { label: "Top 5 priority leads this week",  prompt: "Which 5 leads should the team prioritize this week and why?",   icon: Flame   },
+  { label: "What should I do next?",          prompt: "What should I do next based on the current pipeline state?",                                                                                          icon: Target  },
+  { label: "Draft outreach email",            prompt: "Draft a full sponsorship outreach email for a top uncontacted lead. Use the official Club Garuda email template and fill in their company name.",       icon: Mail    },
+  { label: "Pipeline analysis",               prompt: "Analyze the current pipeline and identify the top risks.",                                                                                              icon: TrendingUp },
+  { label: "Negotiation strategy",            prompt: "Give me a negotiation strategy for our highest-value stalled deal.",                                                                                   icon: Zap     },
+  { label: "Stalled deal diagnosis",          prompt: "Why might a deal in negotiation stage be stalling and what should we do?",                                                                             icon: Shield  },
+  { label: "Top 5 priority leads this week",  prompt: "Which 5 leads should the team prioritize this week and why?",                                                                                          icon: Flame   },
 ]
 
 function getTime() {

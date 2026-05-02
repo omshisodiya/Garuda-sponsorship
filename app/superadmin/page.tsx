@@ -1,13 +1,13 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   TrendingUp, TrendingDown, Target,
   CheckCircle, Clock, BarChart3, Zap,
   AlertTriangle, ArrowUpRight, RefreshCw,
   Database, GitBranch, PhoneCall, MessageSquare,
-  IndianRupee,
+  IndianRupee, ChevronRight, X,
 } from "lucide-react"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -169,6 +169,7 @@ type KpiCardProps = {
   accentColor: string
   icon: React.ReactNode
   delay?: number
+  onDrill?: () => void
 }
 
 function KpiCard({
@@ -181,14 +182,18 @@ function KpiCard({
   accentColor,
   icon,
   delay = 0,
+  onDrill,
 }: KpiCardProps) {
   return (
     <motion.div
       className="kpi-card"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={onDrill ? { scale: 1.02 } : undefined}
       transition={{ delay, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      style={{ position: "relative" }}
+      onClick={onDrill}
+      title={onDrill ? "Click to view leads" : undefined}
+      style={{ position: "relative", cursor: onDrill ? "pointer" : undefined }}
     >
       {/* accent bar top-left */}
       <div
@@ -202,6 +207,21 @@ function KpiCard({
           borderRadius: "22px 0 4px 0",
         }}
       />
+
+      {/* drill chevron top-right */}
+      {onDrill && (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            color: "var(--text-3)",
+            opacity: 0.6,
+          }}
+        >
+          <ChevronRight size={13} strokeWidth={2} />
+        </div>
+      )}
 
       {/* icon */}
       <div
@@ -320,6 +340,146 @@ function relativeTime(ts: string): string {
 }
 
 /* ─────────────────────────────────────────────
+   LEAD DRILL PANEL
+───────────────────────────────────────────── */
+const STATUS_BADGE: Record<string, string> = {
+  not_started:   "badge-blue",
+  contacted:     "badge-purple",
+  in_discussion: "badge-gold",
+  confirmed:     "badge-green",
+  rejected:      "badge-red",
+}
+const STAGE_BADGE: Record<string, string> = {
+  prospect:    "badge-blue",
+  qualified:   "badge-purple",
+  proposal:    "badge-gold",
+  negotiation: "badge-orange",
+  won:         "badge-green",
+  lost:        "badge-red",
+}
+
+function LeadDrillPanel({
+  label,
+  leads,
+  users,
+  onClose,
+}: {
+  label: string
+  leads: Lead[]
+  users: Array<{ id: string; name: string; role: string }>
+  onClose: () => void
+}) {
+  function userName(id: string | null) {
+    if (!id) return "Unassigned"
+    return users.find(u => u.id === id)?.name ?? id
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
+          zIndex: 1000, backdropFilter: "blur(2px)",
+        }}
+      />
+      {/* Panel */}
+      <motion.div
+        initial={{ x: "100%" }}
+        animate={{ x: 0 }}
+        exit={{ x: "100%" }}
+        transition={{ type: "spring", stiffness: 340, damping: 36 }}
+        style={{
+          position: "fixed", top: 0, right: 0, bottom: 0,
+          width: "min(680px, 95vw)",
+          background: "var(--surface-1)",
+          border: "1px solid var(--brand-edge)",
+          borderRight: "none",
+          zIndex: 1001,
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "var(--shadow-lg)",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "20px 24px",
+          borderBottom: "1px solid rgba(201,162,75,0.12)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexShrink: 0,
+        }}>
+          <div>
+            <div className="g-label" style={{ marginBottom: 3 }}>Lead Drill-down</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text-1)" }}>{label}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 13, color: "var(--text-3)", fontWeight: 600 }}>{leads.length} leads</span>
+            <button className="btn-ghost" onClick={onClose} style={{ padding: "7px 10px" }}>
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* List */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {leads.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-3)", fontSize: 13 }}>
+              No leads in this category.
+            </div>
+          ) : leads.map(lead => (
+            <div
+              key={lead.id}
+              style={{
+                padding: "12px 14px",
+                background: "rgba(255,255,255,0.025)",
+                border: "1px solid rgba(255,255,255,0.05)",
+                borderRadius: 12,
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: 8,
+                alignItems: "start",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)", marginBottom: 5 }}>
+                  {lead.company}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>
+                  {lead.poc_name}{lead.poc_email ? ` · ${lead.poc_email}` : ""}{lead.poc_phone ? ` · ${lead.poc_phone}` : ""}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <span className={`badge ${STATUS_BADGE[lead.status] ?? "badge-blue"}`} style={{ fontSize: 9 }}>
+                    {lead.status.replace(/_/g, " ")}
+                  </span>
+                  <span className={`badge ${STAGE_BADGE[lead.stage] ?? "badge-blue"}`} style={{ fontSize: 9 }}>
+                    {lead.stage}
+                  </span>
+                  <span style={{ fontSize: 10, color: "var(--text-3)" }}>{lead.category}</span>
+                  <span style={{ fontSize: 10, color: "var(--text-3)" }}>
+                    Assigned: <span style={{ color: "var(--text-2)", fontWeight: 600 }}>{userName(lead.assigned_to)}</span>
+                  </span>
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "var(--brand-2)", fontVariantNumeric: "tabular-nums" }}>
+                  ₹{lead.deal_value.toLocaleString("en-IN")}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 3 }}>
+                  {lead.probability}% · {lead.last_activity || "—"}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
+/* ─────────────────────────────────────────────
    MAIN PAGE
 ───────────────────────────────────────────── */
 export default function SuperAdminDashboard() {
@@ -327,6 +487,14 @@ export default function SuperAdminDashboard() {
   const [dataLoading, setDataLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState("")
   const [refreshing,  setRefreshing]  = useState(false)
+  const [drill,       setDrill]       = useState<{ label: string; leads: Lead[] } | null>(null)
+  const [users,       setUsers]       = useState<Array<{ id: string; name: string; role: string }>>([])
+
+  type SessionEntry = {
+    userId: string; userName: string; loginAt: string;
+    logoutAt: string | null; durationMins: number | null; ip: string
+  }
+  const [sessions, setSessions] = useState<SessionEntry[]>([])
 
   const stats = useMemo(() => computeStats(leads), [leads])
 
@@ -444,11 +612,14 @@ export default function SuperAdminDashboard() {
 
   async function loadLeads() {
     try {
-      const res = await fetch("/api/leads")
-      if (res.ok) {
-        const data = await res.json()
-        setLeads(data.leads ?? [])
-      }
+      const [leadsRes, usersRes, sessionsData] = await Promise.all([
+        fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch("/api/audit/sessions").then(r => r.ok ? r.json() : null).catch(() => null),
+      ])
+      if (leadsRes)    setLeads(leadsRes.leads ?? [])
+      if (usersRes)    setUsers(usersRes.users ?? [])
+      if (sessionsData) setSessions(sessionsData.sessions ?? [])
     } catch { /* silent */ } finally {
       setDataLoading(false)
       setLastUpdated(
@@ -458,22 +629,29 @@ export default function SuperAdminDashboard() {
   }
 
   useEffect(() => {
-    fetch("/api/leads")
-      .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data) setLeads(data.leads ?? []) })
-      .catch(() => {})
-      .finally(() => {
-        setDataLoading(false)
-        setLastUpdated(
-          new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
-        )
-      })
+    Promise.all([
+      fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/audit/sessions").then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([leadsData, usersData, sessionsData]) => {
+      if (leadsData)    setLeads(leadsData.leads ?? [])
+      if (usersData)    setUsers(usersData.users ?? [])
+      if (sessionsData) setSessions(sessionsData.sessions ?? [])
+    }).catch(() => {}).finally(() => {
+      setDataLoading(false)
+      setLastUpdated(
+        new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+      )
+    })
   }, [])
 
   function handleRefresh() {
     setRefreshing(true)
     loadLeads().finally(() => setRefreshing(false))
   }
+
+  /* threeDaysAgo for follow-up drill filter */
+  const threeDaysAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 3); return d }, [])
 
   /* KPI cards data */
   const kpiCards: KpiCardProps[] = [
@@ -484,6 +662,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.unassigned === 0,
       accentColor: "#60A5FA",
       icon: <Database size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "All Leads", leads }),
     },
     {
       label: "Assigned Leads",
@@ -492,6 +671,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.assigned > 0,
       accentColor: "#C9A24B",
       icon: <GitBranch size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "Assigned Leads", leads: leads.filter(l => l.assigned_to !== null) }),
     },
     {
       label: "Contacted",
@@ -500,6 +680,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.contacted > 0,
       accentColor: "#A78BFA",
       icon: <PhoneCall size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "Contacted Leads", leads: leads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status)) }),
     },
     {
       label: "In Discussion",
@@ -508,6 +689,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.inDiscussion > 0,
       accentColor: "#F59E0B",
       icon: <MessageSquare size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "In Discussion", leads: leads.filter(l => l.status === "in_discussion") }),
     },
     {
       label: "Confirmed Sponsors",
@@ -516,6 +698,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.confirmed > 0,
       accentColor: "#4ADE80",
       icon: <CheckCircle size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "Confirmed Sponsors", leads: leads.filter(l => l.status === "confirmed") }),
     },
     {
       label: "Revenue Secured",
@@ -525,6 +708,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.progressPct > 0,
       accentColor: "#C9A24B",
       icon: <IndianRupee size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "Confirmed Sponsors", leads: leads.filter(l => l.status === "confirmed") }),
     },
     {
       label: "Pipeline Value",
@@ -534,6 +718,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.pipeline > 0,
       accentColor: "#60A5FA",
       icon: <TrendingUp size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "Pipeline Leads", leads: leads.filter(l => !["confirmed","rejected"].includes(l.status)) }),
     },
     {
       label: "Target Progress",
@@ -551,6 +736,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.followUpsDue === 0,
       accentColor: "#F59E0B",
       icon: <Clock size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "Follow-ups Overdue", leads: leads.filter(l => !["confirmed","rejected"].includes(l.status) && new Date(l.last_activity) < threeDaysAgo) }),
     },
     {
       label: "Conversion Rate",
@@ -560,6 +746,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.conversionRate > 0,
       accentColor: "#4ADE80",
       icon: <BarChart3 size={18} strokeWidth={1.5} />,
+      onDrill: () => setDrill({ label: "Qualified Leads", leads: leads.filter(l => ["qualified","proposal","negotiation","won"].includes(l.stage)) }),
     },
   ]
 
@@ -591,6 +778,16 @@ export default function SuperAdminDashboard() {
   const pipelineOnTopPct = Math.min(stats.pipelinePct, 100) - securedPct
   const remainingPct = Math.max(0, 100 - securedPct - pipelineOnTopPct)
 
+  function fmtTime(ts: string) {
+    return new Date(ts).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })
+  }
+  function fmtDuration(mins: number | null) {
+    if (mins === null) return "—"
+    if (mins < 1) return "<1 min"
+    if (mins < 60) return `${mins} min`
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`
+  }
+
   if (dataLoading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: 12 }}>
@@ -602,6 +799,17 @@ export default function SuperAdminDashboard() {
   }
 
   return (
+    <>
+      <AnimatePresence>
+        {drill && (
+          <LeadDrillPanel
+            label={drill.label}
+            leads={drill.leads}
+            users={users}
+            onClose={() => setDrill(null)}
+          />
+        )}
+      </AnimatePresence>
     <div
       style={{
         padding: "28px 32px",
@@ -1330,6 +1538,71 @@ export default function SuperAdminDashboard() {
           </div>
         </motion.div>
       </div>
+
+      {/* ── SESSION HISTORY ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.85, duration: 0.5 }}
+        className="panel"
+        style={{ marginTop: 20 }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div className="g-label" style={{ marginBottom: 4 }}>Superadmin Only</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1)" }}>Login History</div>
+          </div>
+          <span style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+            {sessions.length} sessions recorded
+          </span>
+        </div>
+
+        {sessions.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-3)", fontSize: 12 }}>
+            No session history yet.
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="g-table" style={{ minWidth: 700 }}>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Login Time</th>
+                  <th>Logout Time</th>
+                  <th>Duration</th>
+                  <th>IP / Source</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s, i) => (
+                  <tr key={i}>
+                    <td style={{ fontWeight: 700, color: "var(--text-1)" }}>{s.userName}</td>
+                    <td style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-2)" }}>
+                      {fmtTime(s.loginAt)}
+                    </td>
+                    <td style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-2)" }}>
+                      {s.logoutAt ? fmtTime(s.logoutAt) : "—"}
+                    </td>
+                    <td style={{ fontWeight: 600, color: s.durationMins !== null ? "var(--text-1)" : "var(--text-3)" }}>
+                      {fmtDuration(s.durationMins)}
+                    </td>
+                    <td style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                      {s.ip || "unknown"}
+                    </td>
+                    <td>
+                      {s.logoutAt
+                        ? <span className="badge badge-green" style={{ fontSize: 9 }}>Logged out</span>
+                        : <span className="badge badge-orange" style={{ fontSize: 9 }}>Session ended</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </motion.div>
     </div>
+    </>
   )
 }

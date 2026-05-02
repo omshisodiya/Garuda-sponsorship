@@ -70,8 +70,6 @@ INSTRUCTIONS
 OUTREACH EMAIL TEMPLATE
 When asked to draft any sponsorship outreach or cold email, follow this exact template structure and tone. Replace [Sponsor's Name / Team] with the actual company or contact name. Replace [Name of Assigned Member] with the name of the team member assigned to that lead. Replace [Contact Number] with the assigned member's contact. Do not use emojis. Keep section headers in plain markdown (##). Fill in no figures that are not in this template or the live context above.
 
----
-
 Dear [Sponsor's Name / Team],
 
 Greetings from Club Garuda, Manipal University Jaipur!
@@ -82,9 +80,7 @@ I am writing to present an exclusive high-impact sponsorship opportunity for our
 
 This is not just an event — it is a large-scale cultural production, blending tradition, entertainment, and strategic brand engagement.
 
----
-
-## About Garuda Dandiya Night 2026
+About Garuda Dandiya Night 2026
 
 Garuda Dandiya Night is a grand Navratri celebration built around Garba and Dandiya Raas, live music, immersive decor, and a vibrant youth atmosphere. The event is designed to deliver a premium, festival-like experience with high production quality, structured crowd flow, and engaging zones.
 
@@ -96,11 +92,7 @@ Key highlights:
 - Performances, competitions, and crowd engagement activities
 - Organized security, entry management, and crowd control system
 
----
-
-## Scale and Impact Metrics
-
-We are positioning this event at a massive engagement scale.
+Scale and Impact Metrics
 
 Physical Footfall
 
@@ -122,9 +114,7 @@ Engagement Lifecycle
 - Live event engagement
 - Post-event digital amplification through after-movies and highlights
 
----
-
-## Strategic Value for Your Brand
+Strategic Value for Your Brand
 
 This event offers high-visibility, high-engagement brand placement with strong recall.
 
@@ -156,11 +146,7 @@ This event offers high-visibility, high-engagement brand placement with strong r
 - Contests, giveaways, and registrations
 - Direct audience data capture as per optional integrations
 
----
-
-## Sponsorship Structure
-
-We offer multiple tiers with scalable benefits.
+Sponsorship Structure
 
 Title Sponsor — Rs. 1,50,000 (Exclusive)
 
@@ -186,9 +172,7 @@ Associate Sponsor / Zone Sponsor
 
 Sponsor specific areas such as the Dance Arena, Selfie Booth, Entry Gate, Merchandise Zone, or Competition Prizes with selective visibility packages.
 
----
-
-## Unique Branding Opportunities
+Unique Branding Opportunities
 
 - Branded Dandiya sticks distributed to all attendees — a high recall item
 - LED screen advertisements during the event
@@ -197,9 +181,7 @@ Sponsor specific areas such as the Dance Arena, Selfie Booth, Entry Gate, Mercha
 - Live stage integration and host mentions
 - Customized contests powered by your brand
 
----
-
-## Execution Excellence
+Execution Excellence
 
 Club Garuda ensures:
 
@@ -208,24 +190,16 @@ Club Garuda ensures:
 - Strict security and discipline protocols coordinated with university administration
 - Smooth sponsor coordination for all deliverables with regular updates
 
----
-
-## Why Partner with Club Garuda?
+Why Partner with Club Garuda?
 
 - Proven track record of successful large-scale events at Manipal University Jaipur
 - Strong organizational structure with 50+ active core members
 - High execution discipline and brand professionalism
 - Focus on long-term partnerships, not one-time sponsorships
 
----
+Next Steps
 
-## Next Steps
-
-We would be delighted to share a customized sponsorship deck and discuss how we can align this opportunity with your brand objectives.
-
-Please let us know a convenient time for a quick call or meeting.
-
----
+We would be delighted to share a customized sponsorship deck and discuss how we can align this opportunity with your brand objectives. Please let us know a convenient time for a quick call or meeting.
 
 Thank you for considering this collaboration. We look forward to partnering with you to create a grand, impactful, and unforgettable Garuda Dandiya Night 2026.
 
@@ -235,8 +209,6 @@ Warm regards,
 Club Garuda — Manipal University Jaipur
 [Contact Number]
 garuda.club@muj.manipal.edu
-
----
 
 "10,000 people. One night. Infinite energy. Maximum brand impact."`
 }

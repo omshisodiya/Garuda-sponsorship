@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo } from "react"
+import * as XLSX from "xlsx"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   TrendingUp, TrendingDown, Target,
@@ -480,6 +481,106 @@ function LeadDrillPanel({
 }
 
 /* ─────────────────────────────────────────────
+   EXPORT REPORT
+───────────────────────────────────────────── */
+function exportDashboardReport(
+  leads: Lead[],
+  users: Array<{ id: string; name: string; role: string }>,
+  stats: ReturnType<typeof computeStats>
+) {
+  const wb = XLSX.utils.book_new()
+  const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+
+  // ── Summary ──
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+    { "Metric": "Report Date",            "Value": date },
+    { "Metric": "Total Leads",            "Value": stats.total },
+    { "Metric": "Assigned",               "Value": stats.assigned },
+    { "Metric": "Unassigned",             "Value": stats.unassigned },
+    { "Metric": "Contacted",              "Value": stats.contacted },
+    { "Metric": "In Discussion",          "Value": stats.inDiscussion },
+    { "Metric": "Confirmed Sponsors",     "Value": stats.confirmed },
+    { "Metric": "Revenue Secured (₹)",    "Value": stats.secured },
+    { "Metric": "Weighted Pipeline (₹)",  "Value": stats.pipeline },
+    { "Metric": "Target (₹)",             "Value": stats.target },
+    { "Metric": "Progress (%)",           "Value": stats.progressPct },
+    { "Metric": "Conversion Rate (%)",    "Value": stats.conversionRate },
+    { "Metric": "Follow-ups Overdue",     "Value": stats.followUpsDue },
+  ]), "Summary")
+
+  // ── Status Breakdown ──
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    ["not_started","contacted","in_discussion","confirmed","rejected"].map(s => ({
+      "Status":       s.replace(/_/g, " "),
+      "Count":        leads.filter(l => l.status === s).length,
+      "Total Value (₹)": leads.filter(l => l.status === s).reduce((sum, l) => sum + l.deal_value, 0),
+    }))
+  ), "Status Breakdown")
+
+  // ── Category Breakdown ──
+  const cats = new Map<string, { count: number; revenue: number }>()
+  for (const l of leads) {
+    const c = cats.get(l.category) ?? { count: 0, revenue: 0 }
+    cats.set(l.category, { count: c.count + 1, revenue: c.revenue + l.deal_value })
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    [...cats.entries()].map(([name, v]) => ({
+      "Category":            name,
+      "Lead Count":          v.count,
+      "Total Deal Value (₹)": v.revenue,
+      "Avg Deal Value (₹)":  Math.round(v.revenue / v.count),
+    }))
+  ), "Category Breakdown")
+
+  // ── Team Performance ──
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    users.filter(u => u.role !== "superadmin").map(u => {
+      const ml  = leads.filter(l => l.assigned_to === u.id)
+      const con = ml.filter(l => l.status === "confirmed")
+      return {
+        "Member":               u.name,
+        "Role":                 u.role,
+        "Assigned Leads":       ml.length,
+        "Contacted":            ml.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status)).length,
+        "In Discussion":        ml.filter(l => l.status === "in_discussion").length,
+        "Confirmed":            con.length,
+        "Revenue Secured (₹)":  con.reduce((s, l) => s + l.deal_value, 0),
+        "Pipeline Value (₹)":   Math.round(ml.filter(l => !["rejected","confirmed"].includes(l.status)).reduce((s, l) => s + l.deal_value * l.probability / 100, 0)),
+      }
+    })
+  ), "Team Performance")
+
+  // ── All Leads ──
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    leads.map(l => ({
+      "Company":        l.company,
+      "POC Name":       l.poc_name,
+      "Email":          l.poc_email,
+      "Phone":          l.poc_phone,
+      "Category":       l.category,
+      "Status":         l.status.replace(/_/g, " "),
+      "Stage":          l.stage,
+      "Assigned To":    users.find(u => u.id === l.assigned_to)?.name ?? "Unassigned",
+      "Deal Value (₹)": l.deal_value,
+      "Probability (%)":l.probability,
+      "Last Activity":  l.last_activity,
+      "Notes":          l.notes,
+    }))
+  ), "All Leads")
+
+  const buf  = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
+  a.download = `Garuda_Report_${new Date().toISOString().split("T")[0]}.xlsx`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/* ─────────────────────────────────────────────
    MAIN PAGE
 ───────────────────────────────────────────── */
 export default function SuperAdminDashboard() {
@@ -902,7 +1003,7 @@ export default function SuperAdminDashboard() {
             />
             Refresh
           </button>
-          <button className="btn-gold" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button className="btn-gold" onClick={() => exportDashboardReport(leads, users, stats)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <ArrowUpRight size={13} strokeWidth={2} />
             Export
           </button>

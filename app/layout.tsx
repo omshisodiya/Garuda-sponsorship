@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Database, Columns3, GitBranch, Zap, Bell,
   Users, Vault, Mail, Target, Brain, Shield, ChevronLeft,
   ChevronRight, Search, LogOut, Flame, Map, Trophy, BookOpen,
-  Terminal,
+  Terminal, Sun, Moon,
 } from "lucide-react"
 
 const NAV: Record<string, Array<{ label: string; href: string; icon: React.ElementType; badge?: string }>> = {
@@ -84,6 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [mounted, setMounted]   = useState(false)
   const [time, setTime]         = useState("")
   const [alerts, setAlerts]     = useState(3)
+  const [theme, setTheme]       = useState<"dark" | "light">("dark")
 
   const pathname = usePathname()
   const router   = useRouter()
@@ -124,6 +125,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     window.addEventListener("keydown", h)
     return () => window.removeEventListener("keydown", h)
   }, [openCmd])
+
+  useEffect(() => {
+    const saved = localStorage.getItem("g_theme") as "dark" | "light" | null
+    if (saved) setTheme(saved)
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme)
+    localStorage.setItem("g_theme", theme)
+  }, [theme])
 
   const cmdFiltered = CMD_ROUTES.filter(r =>
     r.label.toLowerCase().includes(cmdQuery.toLowerCase()) ||
@@ -171,17 +182,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             style={{
               width: sideW, minWidth: sideW, height: "100vh",
               display: "flex", flexDirection: "column",
-              background: "rgba(7,7,10,0.82)",
+              background: "var(--sidebar-bg)",
               backdropFilter: "blur(36px)", WebkitBackdropFilter: "blur(36px)",
-              borderRight: "1px solid rgba(201,162,75,0.1)",
+              borderRight: "1px solid var(--sidebar-border)",
               position: "relative", zIndex: 100, overflow: "hidden", flexShrink: 0,
             }}
           >
             {/* ambient top glow */}
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 180, background: "radial-gradient(ellipse at top, rgba(107,15,26,0.22) 0%, transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 180, background: "radial-gradient(ellipse at top, var(--sidebar-top-glow) 0%, transparent 70%)", pointerEvents: "none" }} />
 
             {/* Brand */}
-            <div style={{ padding: expanded ? "22px 18px 18px" : "22px 12px 18px", display: "flex", alignItems: "center", gap: 11, borderBottom: "1px solid rgba(201,162,75,0.08)", flexShrink: 0, position: "relative" }}>
+            <div style={{ padding: expanded ? "22px 18px 18px" : "22px 12px 18px", display: "flex", alignItems: "center", gap: 11, borderBottom: "1px solid var(--sidebar-brand-border)", flexShrink: 0, position: "relative" }}>
               <motion.div
                 whileHover={{ rotate: 4, scale: 1.08 }}
                 transition={{ type: "spring", stiffness: 400, damping: 20 }}
@@ -307,7 +318,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
 
             {/* TOP BAR */}
-            <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 24px", borderBottom: "1px solid rgba(201,162,75,0.08)", background: "rgba(7,7,10,0.65)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", gap: 16, flexShrink: 0, zIndex: 50 }}>
+            <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 24px", borderBottom: "1px solid var(--topbar-border)", background: "var(--topbar-bg)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", gap: 16, flexShrink: 0, zIndex: 50 }}>
               {/* breadcrumb */}
               <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-3)" }}>
                 <span style={{ color: "var(--text-brand)" }}>Garuda</span>
@@ -321,11 +332,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <motion.button
                 whileHover={{ scale: 1.01 }}
                 onClick={openCmd}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(201,162,75,0.12)", borderRadius: "var(--r-sm)", color: "var(--text-3)", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", background: "var(--topbar-search-bg)", border: "1px solid var(--topbar-search-border)", borderRadius: "var(--r-sm)", color: "var(--text-3)", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
               >
                 <Search size={12} />
                 <span>Search leads, actions…</span>
                 <kbd style={{ padding: "1px 6px", borderRadius: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", fontSize: 9, marginLeft: 4 }}>⌘K</kbd>
+              </motion.button>
+
+              {/* theme toggle */}
+              <motion.button
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
+                className="theme-toggle"
+                title={theme === "dark" ? "Switch to Day Mode" : "Switch to Dark Mode"}
+              >
+                {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
               </motion.button>
 
               {/* alerts */}
@@ -333,7 +354,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <motion.button
                   whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                   onClick={() => router.push("/alerts")}
-                  style={{ width: 34, height: 34, borderRadius: "var(--r-sm)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,162,75,0.12)", color: "var(--text-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  style={{ width: 34, height: 34, borderRadius: "var(--r-sm)", background: "var(--topbar-alert-bg)", border: "1px solid var(--topbar-alert-border)", color: "var(--text-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                 >
                   <Bell size={14} />
                 </motion.button>
@@ -343,7 +364,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
 
               {/* clock */}
-              <div style={{ padding: "5px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(201,162,75,0.08)", borderRadius: "var(--r-sm)", fontSize: 11, fontWeight: 600, color: "var(--text-brand)", fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em" }}>
+              <div style={{ padding: "5px 12px", background: "var(--topbar-clock-bg)", border: "1px solid var(--topbar-clock-border)", borderRadius: "var(--r-sm)", fontSize: 11, fontWeight: 600, color: "var(--text-brand)", fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em" }}>
                 {time}
               </div>
 

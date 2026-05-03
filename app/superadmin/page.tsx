@@ -256,11 +256,9 @@ function KpiCard({
       <div
         className="badge"
         style={{
-          background: trendUp
-            ? "rgba(74,222,128,0.1)"
-            : "rgba(244,63,94,0.1)",
+          background: `var(${trendUp ? "--kpi-up-bg" : "--kpi-dn-bg"})`,
           color: trendUp ? "var(--success)" : "var(--danger)",
-          border: `1px solid ${trendUp ? "rgba(74,222,128,0.2)" : "rgba(244,63,94,0.2)"}`,
+          border: `1px solid var(${trendUp ? "--kpi-up-border" : "--kpi-dn-border"})`,
           gap: 3,
         }}
       >

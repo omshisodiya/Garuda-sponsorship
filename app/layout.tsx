@@ -9,8 +9,34 @@ import {
   LayoutDashboard, Database, Columns3, GitBranch, Zap, Bell,
   Users, Vault, Mail, Target, Brain, Shield, ChevronLeft,
   ChevronRight, Search, LogOut, Flame, Map, Trophy, BookOpen,
-  Terminal, Sun, Moon,
+  Terminal, Sun, Moon, AlertCircle, Info, AlertTriangle, X as XIcon,
 } from "lucide-react"
+
+type InboxNotif = {
+  id: number
+  title: string
+  body: string
+  url?: string
+  importance: string
+  sent_at: string
+}
+
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/")
+  const rawData = window.atob(base64)
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0))).buffer
+}
+
+function relTimeShort(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1)  return "just now"
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
 
 const NAV: Record<string, Array<{ label: string; href: string; icon: React.ElementType; badge?: string }>> = {
   superadmin: [
@@ -83,8 +109,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [cmdIdx, setCmdIdx]     = useState(0)
   const [mounted, setMounted]   = useState(false)
   const [time, setTime]         = useState("")
-  const [alerts, setAlerts]     = useState(3)
   const [theme, setTheme]       = useState<"dark" | "light">("dark")
+  const [userId, setUserId]     = useState("")
+  const [bellOpen, setBellOpen] = useState(false)
+  const [inboxNotifs, setInboxNotifs] = useState<InboxNotif[]>([])
+  const [readIds, setReadIds]   = useState<Set<number>>(new Set())
 
   const pathname = usePathname()
   const router   = useRouter()
@@ -98,6 +127,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         if (data?.user) {
           setRole(data.user.role)
           setUser(data.user.name)
+          setUserId(data.user.id)
           sessionStorage.setItem("g_role", data.user.role)
           sessionStorage.setItem("g_name", data.user.name)
         }
@@ -105,6 +135,49 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       .catch(() => {})
     return () => window.clearTimeout(t)
   }, [])
+
+  // Fetch in-app notification inbox
+  useEffect(() => {
+    fetch("/api/push/inbox")
+      .then(r => r.ok ? r.json() : { notifications: [] })
+      .then(d => setInboxNotifs(d.notifications ?? []))
+      .catch(() => {})
+    const saved = localStorage.getItem("g_notif_reads")
+    if (saved) {
+      try { setReadIds(new Set(JSON.parse(saved) as number[])) } catch { /* ignore */ }
+    }
+  }, [])
+
+  // Register service worker + subscribe to push when user ID is known
+  useEffect(() => {
+    if (!userId || typeof window === "undefined") return
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
+
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidKey) return
+
+    ;(async () => {
+      try {
+        const reg = await navigator.serviceWorker.register("/sw.js")
+        const permission = await Notification.requestPermission()
+        if (permission !== "granted") return
+
+        const existing = await reg.pushManager.getSubscription()
+        const sub = existing ?? await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        })
+
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription: sub.toJSON() }),
+        })
+      } catch {
+        // push not supported or denied — silently ignore
+      }
+    })()
+  }, [userId])
 
   useEffect(() => {
     const tick = () => {
@@ -315,7 +388,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </motion.aside>
 
           {/* MAIN */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", position: "relative" }}>
 
             {/* TOP BAR */}
             <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 24px", borderBottom: "1px solid var(--topbar-border)", background: "var(--topbar-bg)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", gap: 16, flexShrink: 0, zIndex: 50 }}>
@@ -349,17 +422,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
               </motion.button>
 
-              {/* alerts */}
+              {/* alerts / bell */}
               <div style={{ position: "relative" }}>
                 <motion.button
                   whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                  onClick={() => router.push("/alerts")}
+                  onClick={() => setBellOpen(o => !o)}
                   style={{ width: 34, height: 34, borderRadius: "var(--r-sm)", background: "var(--topbar-alert-bg)", border: "1px solid var(--topbar-alert-border)", color: "var(--text-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                 >
                   <Bell size={14} />
                 </motion.button>
-                {alerts > 0 && (
-                  <span style={{ position: "absolute", top: -4, right: -4, width: 16, height: 16, background: "var(--danger)", border: "1.5px solid var(--bg-0)", borderRadius: "50%", fontSize: 8, fontWeight: 800, color: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>{alerts}</span>
+                {inboxNotifs.filter(n => !readIds.has(n.id)).length > 0 && (
+                  <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, padding: "0 3px", background: "var(--danger)", border: "1.5px solid var(--bg-0)", borderRadius: "50%", fontSize: 8, fontWeight: 800, color: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {inboxNotifs.filter(n => !readIds.has(n.id)).length}
+                  </span>
                 )}
               </div>
 
@@ -374,6 +449,108 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span style={{ fontSize: 10, color: "rgba(74,222,128,0.7)", fontWeight: 600 }}>LIVE</span>
               </div>
             </div>
+
+            {/* BELL NOTIFICATION PANEL */}
+            <AnimatePresence>
+              {bellOpen && (
+                <>
+                  {/* backdrop */}
+                  <motion.div
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    onClick={() => setBellOpen(false)}
+                    style={{ position: "fixed", inset: 0, zIndex: 200 }}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                    transition={{ duration: 0.18, ease: [0.4,0,0.2,1] }}
+                    style={{
+                      position: "absolute", top: 60, right: 24, width: 370, maxHeight: 500,
+                      background: "var(--bg-2)", border: "1px solid var(--brand-edge)",
+                      borderRadius: "var(--r-xl)", zIndex: 201, overflow: "hidden",
+                      boxShadow: "var(--shadow-xl)",
+                      display: "flex", flexDirection: "column",
+                    }}
+                  >
+                    {/* Header */}
+                    <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Bell size={14} style={{ color: "var(--brand-2)" }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-1)" }}>Notifications</span>
+                        {inboxNotifs.filter(n => !readIds.has(n.id)).length > 0 && (
+                          <span className="badge badge-red" style={{ fontSize: 9 }}>
+                            {inboxNotifs.filter(n => !readIds.has(n.id)).length} new
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {inboxNotifs.length > 0 && (
+                          <button
+                            onClick={() => {
+                              const all = new Set(inboxNotifs.map(n => n.id))
+                              setReadIds(all)
+                              localStorage.setItem("g_notif_reads", JSON.stringify([...all]))
+                            }}
+                            style={{ fontSize: 10, color: "var(--text-brand)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                        <button onClick={() => setBellOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", display: "flex" }}>
+                          <XIcon size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* List */}
+                    <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+                      {inboxNotifs.length === 0 ? (
+                        <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
+                          No notifications yet
+                        </div>
+                      ) : inboxNotifs.map(n => {
+                        const isUnread = !readIds.has(n.id)
+                        const IconComp = n.importance === "critical" ? AlertCircle : n.importance === "warning" ? AlertTriangle : Info
+                        const iconColor = n.importance === "critical" ? "var(--danger)" : n.importance === "warning" ? "var(--warning)" : "var(--info)"
+                        return (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              const next = new Set(readIds)
+                              next.add(n.id)
+                              setReadIds(next)
+                              localStorage.setItem("g_notif_reads", JSON.stringify([...next]))
+                              if (n.url) { setBellOpen(false); router.push(n.url) }
+                            }}
+                            style={{
+                              display: "flex", gap: 12, padding: "12px 18px",
+                              cursor: n.url ? "pointer" : "default",
+                              background: isUnread ? "var(--glass-2)" : "transparent",
+                              borderBottom: "1px solid var(--brand-edge)",
+                              transition: "background 0.12s",
+                            }}
+                          >
+                            <div style={{ width: 30, height: 30, borderRadius: 8, background: `${iconColor}18`, border: `1px solid ${iconColor}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              <IconComp size={13} style={{ color: iconColor }} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: isUnread ? 700 : 500, color: "var(--text-1)", marginBottom: 2, display: "flex", justifyContent: "space-between", gap: 6 }}>
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</span>
+                                <span style={{ fontSize: 10, color: "var(--text-3)", flexShrink: 0 }}>{relTimeShort(n.sent_at)}</span>
+                              </div>
+                              <div style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.4 }}>{n.body}</div>
+                              {n.url && <div style={{ fontSize: 10, color: "var(--info)", marginTop: 4 }}>{n.url} →</div>}
+                            </div>
+                            {isUnread && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--brand-2)", flexShrink: 0, marginTop: 4 }} />}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
 
             {/* PAGE */}
             <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>

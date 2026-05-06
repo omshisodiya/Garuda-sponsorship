@@ -8,7 +8,7 @@ import {
   CheckCircle, Clock, BarChart3, Zap,
   AlertTriangle, ArrowUpRight, RefreshCw,
   Database, GitBranch, PhoneCall, MessageSquare,
-  IndianRupee, ChevronRight, X,
+  IndianRupee, ChevronRight, X, Bell, Send, Users2,
 } from "lucide-react"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -595,6 +595,20 @@ export default function SuperAdminDashboard() {
   }
   const [sessions, setSessions] = useState<SessionEntry[]>([])
 
+  type NotifHistory = {
+    id: number; title: string; body: string; url?: string
+    importance: string; target_type: string; target_value?: string
+    sent_by: string; sent_at: string; recipient_count: number
+  }
+  const [notifTitle,       setNotifTitle]       = useState("")
+  const [notifBody,        setNotifBody]         = useState("")
+  const [notifImportance,  setNotifImportance]   = useState<"info"|"warning"|"critical">("info")
+  const [notifTarget,      setNotifTarget]       = useState<"all"|"role"|"user">("all")
+  const [notifTargetValue, setNotifTargetValue]  = useState("")
+  const [notifUrl,         setNotifUrl]          = useState("")
+  const [notifSending,     setNotifSending]      = useState(false)
+  const [notifHistory,     setNotifHistory]      = useState<NotifHistory[]>([])
+
   const stats = useMemo(() => computeStats(leads), [leads])
 
   /* Monthly revenue computed from live leads (Jan → current month) */
@@ -711,14 +725,16 @@ export default function SuperAdminDashboard() {
 
   async function loadLeads() {
     try {
-      const [leadsRes, usersRes, sessionsData] = await Promise.all([
+      const [leadsRes, usersRes, sessionsData, historyData] = await Promise.all([
         fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
         fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
         fetch("/api/audit/sessions").then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch("/api/push/history").then(r => r.ok ? r.json() : null).catch(() => null),
       ])
       if (leadsRes)    setLeads(leadsRes.leads ?? [])
       if (usersRes)    setUsers(usersRes.users ?? [])
       if (sessionsData) setSessions(sessionsData.sessions ?? [])
+      if (historyData)  setNotifHistory(historyData.notifications ?? [])
     } catch { /* silent */ } finally {
       setDataLoading(false)
       setLastUpdated(
@@ -732,10 +748,12 @@ export default function SuperAdminDashboard() {
       fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/audit/sessions").then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([leadsData, usersData, sessionsData]) => {
+      fetch("/api/push/history").then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([leadsData, usersData, sessionsData, historyData]) => {
       if (leadsData)    setLeads(leadsData.leads ?? [])
       if (usersData)    setUsers(usersData.users ?? [])
       if (sessionsData) setSessions(sessionsData.sessions ?? [])
+      if (historyData)  setNotifHistory(historyData.notifications ?? [])
     }).catch(() => {}).finally(() => {
       setDataLoading(false)
       setLastUpdated(
@@ -743,6 +761,46 @@ export default function SuperAdminDashboard() {
       )
     })
   }, [])
+
+  async function sendNotification() {
+    if (!notifTitle || !notifBody) return
+    setNotifSending(true)
+    try {
+      await fetch("/api/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: notifTitle, body: notifBody,
+          importance: notifImportance,
+          targetType: notifTarget,
+          targetValue: notifTargetValue || undefined,
+          url: notifUrl || undefined,
+        }),
+      })
+      const h = await fetch("/api/push/history").then(r => r.ok ? r.json() : { notifications: [] })
+      setNotifHistory(h.notifications ?? [])
+      setNotifTitle(""); setNotifBody(""); setNotifUrl("")
+    } finally {
+      setNotifSending(false)
+    }
+  }
+
+  async function sendLeadReminder(uid: string, uName: string) {
+    await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Lead Action Required",
+        body: `${uName}, please review and update your assigned leads.`,
+        importance: "warning",
+        targetType: "user",
+        targetValue: uid,
+        url: "/leads",
+      }),
+    })
+    const h = await fetch("/api/push/history").then(r => r.ok ? r.json() : { notifications: [] })
+    setNotifHistory(h.notifications ?? [])
+  }
 
   function handleRefresh() {
     setRefreshing(true)
@@ -1638,6 +1696,180 @@ export default function SuperAdminDashboard() {
           </div>
         </motion.div>
       </div>
+
+      {/* ── PUSH NOTIFICATIONS ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.80, duration: 0.5 }}
+        className="panel"
+        style={{ marginBottom: 28 }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(201,162,75,0.14)", border: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Bell size={15} style={{ color: "var(--brand-2)" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>Push Notifications</div>
+            <div style={{ fontSize: 11, color: "var(--text-3)" }}>Send real-time notifications to users — works even when the app is closed</div>
+          </div>
+        </div>
+
+        {/* Compose form */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 12, marginBottom: 12 }}>
+          <input
+            className="g-input"
+            placeholder="Notification title…"
+            value={notifTitle}
+            onChange={e => setNotifTitle(e.target.value)}
+            style={{ fontSize: 13 }}
+          />
+          <select
+            className="g-select"
+            value={notifImportance}
+            onChange={e => setNotifImportance(e.target.value as "info"|"warning"|"critical")}
+            style={{ width: "100%" }}
+          >
+            <option value="info">ℹ Info</option>
+            <option value="warning">⚠ Warning</option>
+            <option value="critical">🔴 Critical</option>
+          </select>
+        </div>
+
+        <textarea
+          className="g-input"
+          placeholder="Message body…"
+          value={notifBody}
+          onChange={e => setNotifBody(e.target.value)}
+          style={{ marginBottom: 12, minHeight: 76, resize: "vertical", fontSize: 13 }}
+        />
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <select
+            className="g-select"
+            value={notifTarget}
+            onChange={e => { setNotifTarget(e.target.value as "all"|"role"|"user"); setNotifTargetValue("") }}
+            style={{ width: "100%" }}
+          >
+            <option value="all">📢 All users</option>
+            <option value="role">🎭 By role</option>
+            <option value="user">👤 Specific user</option>
+          </select>
+
+          {notifTarget === "role" && (
+            <select className="g-select" value={notifTargetValue} onChange={e => setNotifTargetValue(e.target.value)} style={{ width: "100%" }}>
+              <option value="">Select role…</option>
+              <option value="admin">Admin</option>
+              <option value="team">Team Member</option>
+              <option value="superadmin">Super Admin</option>
+            </select>
+          )}
+
+          {notifTarget === "user" && (
+            <select className="g-select" value={notifTargetValue} onChange={e => setNotifTargetValue(e.target.value)} style={{ width: "100%" }}>
+              <option value="">Select user…</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+              ))}
+            </select>
+          )}
+
+          <input
+            className="g-input"
+            placeholder="Open URL on click (e.g. /leads)"
+            value={notifUrl}
+            onChange={e => setNotifUrl(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button
+            className="btn-gold"
+            onClick={sendNotification}
+            disabled={notifSending || !notifTitle || !notifBody}
+            style={{ opacity: (notifSending || !notifTitle || !notifBody) ? 0.55 : 1 }}
+          >
+            <Send size={12} />
+            {notifSending ? "Sending…" : "Send Notification"}
+          </button>
+          <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+            {notifTarget === "all" ? "Will reach all subscribed users" : notifTarget === "role" ? `Will reach all ${notifTargetValue || "—"} users` : "Will reach selected user"}
+          </span>
+        </div>
+
+        {/* Lead reminder quick-send */}
+        {users.filter(u => u.role !== "superadmin").length > 0 && (
+          <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--brand-edge)" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-3)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+              Lead Reminder — Quick Send
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {users.filter(u => u.role !== "superadmin").map(u => (
+                <motion.button
+                  key={u.id}
+                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                  className="btn-ghost"
+                  onClick={() => sendLeadReminder(u.id, u.name)}
+                  style={{ padding: "6px 12px", fontSize: 11, gap: 6 }}
+                >
+                  <Users2 size={11} />
+                  {u.name}
+                </motion.button>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 8 }}>
+              Sends a warning push → opens /leads on click
+            </div>
+          </div>
+        )}
+
+        {/* History */}
+        {notifHistory.length > 0 && (
+          <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--brand-edge)" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-3)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
+              Sent History ({notifHistory.length})
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table className="g-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Importance</th>
+                    <th>Target</th>
+                    <th>Delivered</th>
+                    <th>Link</th>
+                    <th>Sent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notifHistory.slice(0, 20).map(n => (
+                    <tr key={n.id}>
+                      <td style={{ fontWeight: 600, color: "var(--text-1)", maxWidth: 200 }}>
+                        <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</div>
+                        <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>
+                      </td>
+                      <td>
+                        <span className={`badge ${n.importance === "critical" ? "badge-red" : n.importance === "warning" ? "badge-orange" : "badge-blue"}`} style={{ fontSize: 9 }}>
+                          {n.importance}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 11, color: "var(--text-2)" }}>
+                        {n.target_type === "all" ? "Everyone" : n.target_type === "role" ? `Role: ${n.target_value}` : `User ID: ${n.target_value}`}
+                      </td>
+                      <td style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)", textAlign: "center" }}>{n.recipient_count}</td>
+                      <td style={{ fontSize: 11, color: "var(--info)", fontFamily: "'JetBrains Mono', monospace" }}>{n.url || "—"}</td>
+                      <td style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
+                        {new Date(n.sent_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </motion.div>
 
       {/* ── SESSION HISTORY ── */}
       <motion.div

@@ -97,8 +97,9 @@ const CMD_ROUTES = [
 
 const ROLE_LABELS: Record<string, string> = { superadmin: "Super Admin", admin: "Admin", team: "Team Member" }
 
-const IDLE_MS   = 7 * 60 * 1000  // 7 min of no activity → show warning
+const IDLE_MS   = 9 * 60 * 1000  // 9 min of no activity → show warning (10 min total)
 const WARN_SECS = 60              // 60-second countdown before auto-logout
+const IDLE_LS   = "g_last_active" // localStorage key shared across all tabs
 
 const SIDEBAR_FULL = 252
 const SIDEBAR_ICON = 66
@@ -217,7 +218,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     localStorage.setItem("g_theme", theme)
   }, [theme])
 
-  // Idle detection — auto-logout after IDLE_MS of no activity
+  // Idle detection — auto-logout after 10 min of no activity across ALL open tabs
   useEffect(() => {
     if (noLayout) return
 
@@ -228,7 +229,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       window.location.href = "/login"
     }
 
-    function reset() {
+    // broadcast=true: this tab had activity, tell other tabs
+    // broadcast=false: another tab had activity, just reset our own timer
+    function reset(broadcast = true) {
+      if (broadcast) localStorage.setItem(IDLE_LS, Date.now().toString())
       if (idleTimerRef.current)  clearTimeout(idleTimerRef.current)
       if (warnTimerRef.current)  clearInterval(warnTimerRef.current)
       warnTimerRef.current = null
@@ -250,13 +254,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       }, IDLE_MS)
     }
 
+    // Pick up activity from other open tabs/windows (storage fires in all OTHER tabs)
+    function onStorage(e: StorageEvent) {
+      if (e.key === IDLE_LS) reset(false)
+    }
+
     resetIdleRef.current = reset
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"] as const
     events.forEach(e => window.addEventListener(e, reset, { passive: true }))
+    window.addEventListener("storage", onStorage)
     reset()
 
     return () => {
       events.forEach(e => window.removeEventListener(e, reset))
+      window.removeEventListener("storage", onStorage)
       if (idleTimerRef.current)  clearTimeout(idleTimerRef.current)
       if (warnTimerRef.current)  clearInterval(warnTimerRef.current)
     }

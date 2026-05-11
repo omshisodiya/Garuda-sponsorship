@@ -301,7 +301,8 @@ function EmailComposeModal({
   const { subject: initSubject, body: initBody } = buildEmail(lead, senderName)
   const [subject, setSubject] = useState(initSubject)
   const [body, setBody]       = useState(initBody)
-  const [copied, setCopied]   = useState(false)
+  const [copied, setCopied]         = useState(false)
+  const [outlookFlash, setOutlookFlash] = useState(false)
 
   function sendGmail() {
     window.open(
@@ -315,9 +316,12 @@ function EmailComposeModal({
   }
 
   function sendOutlook() {
+    navigator.clipboard.writeText(body).catch(() => {})
     const a = document.createElement("a")
-    a.href = `mailto:${lead.poc_email}?cc=${encodeURIComponent(CLUB.email)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    a.href = `mailto:${lead.poc_email}?cc=${encodeURIComponent(CLUB.email)}&subject=${encodeURIComponent(subject)}`
     a.click()
+    setOutlookFlash(true)
+    setTimeout(() => setOutlookFlash(false), 6000)
   }
 
   function copy() {
@@ -372,6 +376,16 @@ function EmailComposeModal({
         {/* Body */}
         <textarea value={body} onChange={e => setBody(e.target.value)}
           style={{ flex: 1, padding: "14px 20px", background: "transparent", border: "none", outline: "none", resize: "none", fontSize: 12, color: "var(--text-2)", lineHeight: 1.75, fontFamily: "inherit", minHeight: 0, overflowY: "auto" }} />
+
+        {/* Outlook paste hint */}
+        <AnimatePresence>
+          {outlookFlash && (
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              style={{ padding: "8px 20px", background: "rgba(96,165,250,0.1)", borderTop: "1px solid rgba(96,165,250,0.25)", fontSize: 11, color: "#60A5FA", flexShrink: 0 }}>
+              Body copied to clipboard — Outlook is opening, paste with <strong>Ctrl + V</strong> in the email body.
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Footer */}
         <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border-1)", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>

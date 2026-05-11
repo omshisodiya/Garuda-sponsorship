@@ -315,14 +315,9 @@ function EmailComposeModal({
   }
 
   function sendOutlook() {
-    window.open(
-      `https://outlook.office.com/mail/deeplink/compose` +
-      `?to=${encodeURIComponent(lead.poc_email)}` +
-      `&cc=${encodeURIComponent(CLUB.email)}` +
-      `&subject=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(body)}`,
-      "_blank"
-    )
+    const a = document.createElement("a")
+    a.href = `mailto:${lead.poc_email}?cc=${encodeURIComponent(CLUB.email)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    a.click()
   }
 
   function copy() {

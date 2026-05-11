@@ -315,14 +315,9 @@ function EmailComposeModal({
   }
 
   function sendOutlook() {
-    window.open(
-      `https://outlook.office.com/mail/deeplink/compose` +
-      `?to=${encodeURIComponent(lead.poc_email)}` +
-      `&cc=${encodeURIComponent(CLUB.email)}` +
-      `&subject=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(body)}`,
-      "_blank"
-    )
+    const a = document.createElement("a")
+    a.href = `mailto:${lead.poc_email}?cc=${encodeURIComponent(CLUB.email)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    a.click()
   }
 
   function copy() {
@@ -332,15 +327,14 @@ function EmailComposeModal({
   }
 
   return (
-    <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(12px)", zIndex: 9996 }}
-        onClick={onClose} />
-      <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(12px)", zIndex: 9996, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+      onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 16 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}
         className="panel"
-        style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 9997,
-          width: "min(780px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
+        style={{ width: "min(780px, 100%)", maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}
+        onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -397,7 +391,7 @@ function EmailComposeModal({
           </button>
         </div>
       </motion.div>
-    </>
+    </motion.div>
   )
 }
 

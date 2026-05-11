@@ -301,8 +301,7 @@ function EmailComposeModal({
   const { subject: initSubject, body: initBody } = buildEmail(lead, senderName)
   const [subject, setSubject] = useState(initSubject)
   const [body, setBody]       = useState(initBody)
-  const [copied, setCopied]         = useState(false)
-  const [outlookFlash, setOutlookFlash] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   function sendGmail() {
     window.open(
@@ -316,12 +315,14 @@ function EmailComposeModal({
   }
 
   function sendOutlook() {
-    navigator.clipboard.writeText(body).catch(() => {})
-    const a = document.createElement("a")
-    a.href = `mailto:${lead.poc_email}?cc=${encodeURIComponent(CLUB.email)}&subject=${encodeURIComponent(subject)}`
-    a.click()
-    setOutlookFlash(true)
-    setTimeout(() => setOutlookFlash(false), 6000)
+    window.open(
+      `https://outlook.office.com/mail/deeplink/compose` +
+      `?to=${encodeURIComponent(lead.poc_email)}` +
+      `&cc=${encodeURIComponent(CLUB.email)}` +
+      `&subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`,
+      "_blank"
+    )
   }
 
   function copy() {
@@ -331,33 +332,6 @@ function EmailComposeModal({
   }
 
   return (
-    <>
-    <AnimatePresence>
-      {outlookFlash && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}>
-          <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
-            className="panel" style={{ width: "min(420px, 92vw)", padding: "28px 28px 22px", textAlign: "center" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-1)", marginBottom: 6 }}>Outlook is opening</div>
-            <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 20, lineHeight: 1.7 }}>
-              The email body has been copied to your clipboard.<br />
-              In Outlook, click inside the email body and press:
-            </div>
-            <div style={{ display: "inline-block", padding: "10px 24px", background: "rgba(201,162,75,0.12)", border: "1px solid rgba(201,162,75,0.4)", borderRadius: "var(--r-md)", fontSize: 22, fontWeight: 900, color: "#C9A24B", letterSpacing: 2, marginBottom: 22 }}>
-              Ctrl + V
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 20 }}>
-              Then attach the PDF and hit Send.
-            </div>
-            <button className="btn-gold" style={{ width: "100%", justifyContent: "center", fontSize: 12 }}
-              onClick={() => setOutlookFlash(false)}>
-              Got it
-            </button>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(12px)", zIndex: 9996, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}
       onClick={onClose}>
@@ -423,7 +397,6 @@ function EmailComposeModal({
         </div>
       </motion.div>
     </motion.div>
-    </>
   )
 }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import "./globals.css"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
@@ -97,6 +97,9 @@ const CMD_ROUTES = [
 
 const ROLE_LABELS: Record<string, string> = { superadmin: "Super Admin", admin: "Admin", team: "Team Member" }
 
+const IDLE_MS   = 7 * 60 * 1000  // 7 min of no activity → show warning
+const WARN_SECS = 60              // 60-second countdown before auto-logout
+
 const SIDEBAR_FULL = 252
 const SIDEBAR_ICON = 66
 
@@ -114,6 +117,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [bellOpen, setBellOpen] = useState(false)
   const [inboxNotifs, setInboxNotifs] = useState<InboxNotif[]>([])
   const [readIds, setReadIds]   = useState<Set<number>>(new Set())
+  const [idleWarning, setIdleWarning] = useState(false)
+  const [idleSecsLeft, setIdleSecsLeft] = useState(WARN_SECS)
+  const idleTimerRef  = useRef<ReturnType<typeof setTimeout>  | null>(null)
+  const warnTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const resetIdleRef  = useRef<(() => void) | null>(null)
 
   const pathname = usePathname()
   const router   = useRouter()
@@ -208,6 +216,51 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     document.documentElement.setAttribute("data-theme", theme)
     localStorage.setItem("g_theme", theme)
   }, [theme])
+
+  // Idle detection — auto-logout after IDLE_MS of no activity
+  useEffect(() => {
+    if (noLayout) return
+
+    async function doLogout() {
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
+      sessionStorage.removeItem("g_role")
+      sessionStorage.removeItem("g_name")
+      window.location.href = "/login"
+    }
+
+    function reset() {
+      if (idleTimerRef.current)  clearTimeout(idleTimerRef.current)
+      if (warnTimerRef.current)  clearInterval(warnTimerRef.current)
+      warnTimerRef.current = null
+      setIdleWarning(false)
+      setIdleSecsLeft(WARN_SECS)
+      idleTimerRef.current = setTimeout(() => {
+        setIdleWarning(true)
+        let secs = WARN_SECS
+        setIdleSecsLeft(secs)
+        warnTimerRef.current = setInterval(() => {
+          secs -= 1
+          setIdleSecsLeft(secs)
+          if (secs <= 0) {
+            clearInterval(warnTimerRef.current!)
+            warnTimerRef.current = null
+            doLogout()
+          }
+        }, 1000)
+      }, IDLE_MS)
+    }
+
+    resetIdleRef.current = reset
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"] as const
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }))
+    reset()
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, reset))
+      if (idleTimerRef.current)  clearTimeout(idleTimerRef.current)
+      if (warnTimerRef.current)  clearInterval(warnTimerRef.current)
+    }
+  }, [noLayout])
 
   const cmdFiltered = CMD_ROUTES.filter(r =>
     r.label.toLowerCase().includes(cmdQuery.toLowerCase()) ||
@@ -607,6 +660,46 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
                 <div style={{ padding: "9px 18px", borderTop: "1px solid rgba(201,162,75,0.08)", display: "flex", gap: 14, fontSize: 10, color: "var(--text-3)" }}>
                   <span>↑↓ Navigate</span><span>Enter Open</span><span>Esc Close</span>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* IDLE WARNING MODAL */}
+        <AnimatePresence>
+          {!noLayout && idleWarning && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.94, y: -10 }}
+                transition={{ duration: 0.2, ease: [0.4,0,0.2,1] }}
+                style={{ width: "100%", maxWidth: 380, background: "var(--bg-2)", border: "1px solid rgba(201,162,75,0.25)", borderRadius: 20, boxShadow: "0 32px 80px rgba(0,0,0,0.7)", padding: "32px 28px", textAlign: "center" }}
+              >
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(201,162,75,0.1)", border: "1px solid rgba(201,162,75,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+                  <span style={{ fontSize: 22, fontVariantNumeric: "tabular-nums", fontWeight: 800, color: idleSecsLeft <= 15 ? "var(--danger)" : "#C9A24B" }}>{idleSecsLeft}</span>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1)", marginBottom: 8 }}>Session expiring</div>
+                <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 24, lineHeight: 1.5 }}>
+                  You&apos;ve been idle. You&apos;ll be logged out in <strong style={{ color: idleSecsLeft <= 15 ? "var(--danger)" : "#C9A24B" }}>{idleSecsLeft}s</strong> unless you continue.
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => resetIdleRef.current?.()}
+                    style={{ flex: 1, padding: "11px 0", borderRadius: "var(--r-md)", background: "linear-gradient(135deg, #6B0F1A, #8B1525)", border: "1px solid rgba(201,162,75,0.22)", color: "#C9A24B", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    Stay logged in
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={logout}
+                    style={{ padding: "11px 16px", borderRadius: "var(--r-md)", background: "var(--danger-bg)", border: "1px solid var(--danger-edge)", color: "var(--danger)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    Logout
+                  </motion.button>
                 </div>
               </motion.div>
             </motion.div>

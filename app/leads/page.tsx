@@ -4,11 +4,11 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Search, Upload, Plus, X, Mail, Phone, ChevronRight,
-  LayoutGrid, List, SlidersHorizontal, Download, Loader, Camera, Save,
+  LayoutGrid, List, SlidersHorizontal, Download, Loader, Camera, Save, Check, Copy,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
-  CATEGORIES, TIERS, type Lead, type LeadStatus, type LeadStage, type Category,
+  CATEGORIES, CLUB, TIERS, type Lead, type LeadStatus, type LeadStage, type Category,
 } from "../lib/data"
 
 // ── DisplayUser helpers ──────────────────────────────────────────────────────
@@ -159,6 +159,248 @@ function exportPerMember(leads: Lead[], users: DisplayUser[]) {
   URL.revokeObjectURL(url)
 }
 
+// ── Email compose ─────────────────────────────────────────────────────────────
+function buildEmail(lead: Lead, senderName: string): { subject: string; body: string } {
+  const c = lead.company
+  const n = lead.poc_name
+  const subject = `Sponsorship Collaboration | Dandiya Night '26 | Club Garuda, MUJ`
+  const body = `Dear ${n},
+
+Greetings from Club Garuda, Manipal University Jaipur!
+
+I hope this message finds you well.
+
+I am writing to present an exclusive high-impact sponsorship opportunity for our flagship cultural event — Garuda Dandiya Night 2026, one of the largest and most anticipated celebrations on campus, designed at a mega scale with 10,000+ expected footfall and 2,00,000+ consolidated digital and on-ground reach.
+
+This is not just an event — it is a large-scale cultural production, blending tradition, entertainment, and strategic brand engagement.
+
+About Garuda Dandiya Night 2026
+
+Garuda Dandiya Night is a grand Navratri celebration built around Garba and Dandiya Raas, live music, immersive decor, and a vibrant youth atmosphere. The event is designed to deliver a premium, festival-like experience with high production quality, structured crowd flow, and engaging zones.
+
+Key highlights:
+
+• Professionally curated Garba and Dandiya arena
+• High-end sound, lighting, and stage setup
+• Themed cultural ambience and decor
+• Performances, competitions, and crowd engagement activities
+• Organized security, entry management, and crowd control system
+
+
+Scale and Impact Metrics
+
+Physical Footfall
+• 10,000+ attendees
+• Students from multiple colleges and institutions across Rajasthan
+• Highly active, socially engaged youth audience
+
+Digital and Promotional Reach
+• 2,00,000+ total consolidated reach
+• Instagram campaigns including reels, collaborations, and paid promotions
+• WhatsApp marketing chains
+• Influencer and campus ambassador promotions
+• Posters, banners, and offline branding across Jaipur
+
+Engagement Lifecycle
+• Pre-event hype campaign running 15 to 20 days prior
+• Live event engagement
+• Post-event digital amplification through after-movies and highlights
+
+Strategic Value for ${c}
+
+1. Massive Brand Exposure
+• Logo integration across all digital and offline creatives
+• Visibility on tickets, banners, entry gates, and stage backdrop
+• Mentions in every promotional campaign and announcement
+
+2. Direct Youth Market Access
+• Engage directly with 10,000+ young consumers
+• Ideal for brand awareness, product trials, and conversions
+
+3. Experiential Marketing
+• On-ground stall and booth setup
+• Product demonstrations, sampling, and live activations
+• Interactive brand experiences within the event space
+
+4. Premium Cultural Association
+• Align ${c} with a high-energy festive experience at MUJ
+• Strong emotional connection leading to higher recall value
+
+5. Data and Lead Generation Opportunities
+• QR-based engagement systems
+• Contests, giveaways, and registrations
+• Direct audience data capture as per optional integrations
+
+Sponsorship Structure
+
+Title Sponsor — Rs. 1,50,000 (Exclusive)
+• "Garuda Dandiya Night 2026 Powered by ${c}"
+• Maximum visibility across all platforms
+• Prime branding on stage, entry gate, and main arena
+• Dedicated speaking and announcement slots
+• Premium stall location with exclusive activation rights
+
+Co-Sponsor — Rs. 95,000
+• Strong co-branding across all creatives
+• High-visibility placements across digital and offline channels
+• On-ground engagement rights
+
+Partner Sponsor — Rs. 75,000
+• Logo placement across major promotions
+• On-stage mentions throughout the event
+• Branding at key event locations
+
+Associate Sponsor / Zone Sponsor
+Sponsor specific areas such as the Dance Arena, Selfie Booth, Entry Gate, Merchandise Zone, or Competition Prizes with selective visibility packages.
+
+Unique Branding Opportunities
+
+• Branded Dandiya sticks distributed to all attendees — a high recall item
+• LED screen advertisements during the event
+• Photo booths with full brand integration
+• Exclusive branded zones within the event
+• Live stage integration and host mentions
+• Customized contests powered by ${c}
+
+Execution Excellence
+
+Club Garuda ensures:
+• Structured event management system with dedicated vertical leads
+• Separate teams for operations, marketing, and logistics
+• Strict security and discipline protocols coordinated with university administration
+• Smooth sponsor coordination for all deliverables with regular updates
+
+
+Why Partner with Club Garuda?
+
+• Proven track record of successful large-scale events at Manipal University Jaipur
+• Strong organizational structure with 50+ active core members
+• High execution discipline and brand professionalism
+• Focus on long-term partnerships, not one-time sponsorships
+
+
+Next Steps
+
+We would be delighted to share a customized sponsorship deck and discuss how we can align this opportunity with your brand objectives. Please let us know a convenient time for a quick call or meeting.
+
+Thank you for considering this collaboration. We look forward to partnering with ${c} to create a grand, impactful, and unforgettable Garuda Dandiya Night 2026.
+
+Warm regards,
+
+${senderName}
+Club Garuda — Manipal University Jaipur
+garuda.club@muj.manipal.edu
+
+"10,000 people. One night. Infinite energy. Maximum brand impact."`
+  return { subject, body }
+}
+
+function EmailComposeModal({
+  lead, senderName, onClose,
+}: { lead: Lead; senderName: string; onClose: () => void }) {
+  const { subject: initSubject, body: initBody } = buildEmail(lead, senderName)
+  const [subject, setSubject] = useState(initSubject)
+  const [body, setBody]       = useState(initBody)
+  const [copied, setCopied]   = useState(false)
+
+  function sendGmail() {
+    window.open(
+      `https://mail.google.com/mail/?view=cm&fs=1` +
+      `&to=${encodeURIComponent(lead.poc_email)}` +
+      `&cc=${encodeURIComponent(CLUB.email)}` +
+      `&su=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`,
+      "_blank"
+    )
+  }
+
+  function sendOutlook() {
+    window.open(
+      `https://outlook.office.com/mail/deeplink/compose` +
+      `?to=${encodeURIComponent(lead.poc_email)}` +
+      `&cc=${encodeURIComponent(CLUB.email)}` +
+      `&subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`,
+      "_blank"
+    )
+  }
+
+  function copy() {
+    navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(12px)", zIndex: 9996 }}
+        onClick={onClose} />
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        className="panel"
+        style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 9997,
+          width: "min(780px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
+
+        {/* Header */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-1)" }}>Compose Sponsorship Email</div>
+            <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>
+              To&nbsp;<span style={{ color: "var(--text-2)" }}>{lead.poc_name}</span>
+              &nbsp;·&nbsp;<span style={{ color: "#C9A24B" }}>{lead.company}</span>
+              &nbsp;·&nbsp;CC: <span style={{ color: "#C9A24B" }}>{CLUB.email}</span>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", padding: 4 }}><X size={15} /></button>
+        </div>
+
+        {/* Fields */}
+        <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", flexDirection: "column", gap: 7, flexShrink: 0 }}>
+          {[
+            { label: "To",  value: lead.poc_email, editable: false, gold: false },
+            { label: "CC",  value: CLUB.email,      editable: false, gold: true  },
+          ].map(({ label, value, gold }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 10, color: "var(--text-3)", width: 22, flexShrink: 0, fontWeight: 600 }}>{label}</span>
+              <div style={{ fontSize: 11, color: gold ? "#C9A24B" : "var(--text-2)", background: gold ? "rgba(201,162,75,0.06)" : "rgba(255,255,255,0.03)", padding: "5px 10px", borderRadius: "var(--r-sm)", flex: 1, border: `1px solid ${gold ? "rgba(201,162,75,0.25)" : "var(--border-1)"}` }}>
+                {value}
+              </div>
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 10, color: "var(--text-3)", width: 22, flexShrink: 0, fontWeight: 600 }}>Sub</span>
+            <input value={subject} onChange={e => setSubject(e.target.value)}
+              style={{ fontSize: 11, color: "var(--text-1)", background: "rgba(255,255,255,0.03)", padding: "5px 10px", borderRadius: "var(--r-sm)", flex: 1, border: "1px solid var(--border-1)", outline: "none", fontFamily: "inherit" }} />
+          </div>
+        </div>
+
+        {/* Body */}
+        <textarea value={body} onChange={e => setBody(e.target.value)}
+          style={{ flex: 1, padding: "14px 20px", background: "transparent", border: "none", outline: "none", resize: "none", fontSize: 12, color: "var(--text-2)", lineHeight: 1.75, fontFamily: "inherit", minHeight: 0, overflowY: "auto" }} />
+
+        {/* Footer */}
+        <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border-1)", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+          <a href="/PDF/Dandiya Sponsorship (1)_compressed.pdf" download
+            style={{ fontSize: 10, color: "#C9A24B", display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 11px", border: "1px solid rgba(201,162,75,0.3)", borderRadius: "var(--r-sm)", background: "rgba(201,162,75,0.06)", textDecoration: "none", flexShrink: 0, fontWeight: 600 }}>
+            <Download size={10} /> Download PDF — attach before sending
+          </a>
+          <div style={{ flex: 1 }} />
+          <button onClick={copy} className="btn-ghost" style={{ fontSize: 10, padding: "6px 11px", display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {copied ? <><Check size={10} /> Copied!</> : <><Copy size={10} /> Copy</>}
+          </button>
+          <button onClick={sendOutlook} className="btn-ghost" style={{ fontSize: 10, padding: "6px 11px" }}>
+            Outlook
+          </button>
+          <button onClick={sendGmail} className="btn-gold" style={{ fontSize: 10, padding: "6px 13px", display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <Mail size={10} /> Send via Gmail
+          </button>
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
 // ── Detail slide-over ─────────────────────────────────────────────────────────
 function DetailPanel({
   lead,
@@ -166,12 +408,14 @@ function DetailPanel({
   currentUser,
   onClose,
   onUpdate,
+  onCompose,
 }: {
   lead: Lead
   users: DisplayUser[]
   currentUser: { id: string; role: string } | null
   onClose: () => void
   onUpdate: (updated: Lead) => void
+  onCompose: (lead: Lead) => void
 }) {
   const [editStatus,     setEditStatus]     = useState<LeadStatus>(lead.status)
   const [dealPreset,     setDealPreset]     = useState<number>(
@@ -409,7 +653,7 @@ function DetailPanel({
             </button>
           )}
           <button className="btn-ghost"
-            onClick={() => window.open(`mailto:${lead.poc_email}?subject=Sponsorship Collaboration | Dandiya Night '26 | Club Garuda&cc=garuda.club@muj.manipal.edu`)}
+            onClick={() => onCompose(lead)}
             style={{ flex: canEdit ? 0 : 1, justifyContent: "center", fontSize: 11, padding: "11px 14px" }}>
             <Mail size={12} />
           </button>
@@ -436,6 +680,7 @@ export default function LeadsPage() {
   const [showAddForm,    setShowAddForm]    = useState(false)
   const [importFlash,    setImportFlash]    = useState("")
   const [addingLead,     setAddingLead]     = useState(false)
+  const [mailLead,       setMailLead]       = useState<Lead | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // new lead form state
@@ -696,7 +941,7 @@ export default function LeadsPage() {
                     </td>
                     <td style={{ paddingRight: 16 }}>
                       <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
-                        <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }} onClick={() => window.open(`mailto:${lead.poc_email}`)}>
+                        <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }} onClick={() => setMailLead(lead)}>
                           <Mail size={11} />
                         </button>
                         <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }} onClick={() => setSelected(lead)}>
@@ -762,6 +1007,7 @@ export default function LeadsPage() {
             currentUser={currentUser}
             onClose={() => setSelected(null)}
             onUpdate={handleLeadUpdate}
+            onCompose={setMailLead}
           />
         )}
       </AnimatePresence>
@@ -864,6 +1110,17 @@ export default function LeadsPage() {
               <div style={{ fontSize: 10, color: "var(--text-3)", textAlign: "center" }}>Up to 200 rows per import. Duplicates kept.</div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Email Compose Modal */}
+      <AnimatePresence>
+        {mailLead && (
+          <EmailComposeModal
+            lead={mailLead}
+            senderName={users.find(u => u.id === currentUser?.id)?.name ?? "Club Garuda Team"}
+            onClose={() => setMailLead(null)}
+          />
         )}
       </AnimatePresence>
 

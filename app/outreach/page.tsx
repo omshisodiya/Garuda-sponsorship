@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Mail, ExternalLink, Copy, Check, Wand2, ChevronRight } from "lucide-react"
+import { Mail, ExternalLink, Copy, Check, Wand2 } from "lucide-react"
 import { CLUB } from "../lib/data"
 
 const TEMPLATES = {
@@ -25,103 +25,103 @@ Garuda Dandiya Night is a grand Navratri celebration built around Garba and Dand
 
 Key highlights:
 
-- Professionally curated Garba and Dandiya arena
-- High-end sound, lighting, and stage setup
-- Themed cultural ambience and decor
-- Performances, competitions, and crowd engagement activities
-- Organized security, entry management, and crowd control system
+• Professionally curated Garba and Dandiya arena
+• High-end sound, lighting, and stage setup
+• Themed cultural ambience and decor
+• Performances, competitions, and crowd engagement activities
+• Organized security, entry management, and crowd control system
 
 
 Scale and Impact Metrics
 
 Physical Footfall
-- 10,000+ attendees
-- Students from multiple colleges and institutions across Rajasthan
-- Highly active, socially engaged youth audience
+• 10,000+ attendees
+• Students from multiple colleges and institutions across Rajasthan
+• Highly active, socially engaged youth audience
 
 Digital and Promotional Reach
-- 2,00,000+ total consolidated reach
-- Instagram campaigns including reels, collaborations, and paid promotions
-- WhatsApp marketing chains
-- Influencer and campus ambassador promotions
-- Posters, banners, and offline branding across Jaipur
+• 2,00,000+ total consolidated reach
+• Instagram campaigns including reels, collaborations, and paid promotions
+• WhatsApp marketing chains
+• Influencer and campus ambassador promotions
+• Posters, banners, and offline branding across Jaipur
 
 Engagement Lifecycle
-- Pre-event hype campaign running 15 to 20 days prior
-- Live event engagement
-- Post-event digital amplification through after-movies and highlights
+• Pre-event hype campaign running 15 to 20 days prior
+• Live event engagement
+• Post-event digital amplification through after-movies and highlights
 
 Strategic Value for [Company]
 
 1. Massive Brand Exposure
-- Logo integration across all digital and offline creatives
-- Visibility on tickets, banners, entry gates, and stage backdrop
-- Mentions in every promotional campaign and announcement
+• Logo integration across all digital and offline creatives
+• Visibility on tickets, banners, entry gates, and stage backdrop
+• Mentions in every promotional campaign and announcement
 
 2. Direct Youth Market Access
-- Engage directly with 10,000+ young consumers
-- Ideal for brand awareness, product trials, and conversions
+• Engage directly with 10,000+ young consumers
+• Ideal for brand awareness, product trials, and conversions
 
 3. Experiential Marketing
-- On-ground stall and booth setup
-- Product demonstrations, sampling, and live activations
-- Interactive brand experiences within the event space
+• On-ground stall and booth setup
+• Product demonstrations, sampling, and live activations
+• Interactive brand experiences within the event space
 
 4. Premium Cultural Association
-- Align [Company] with a high-energy festive experience at MUJ
-- Strong emotional connection leading to higher recall value
+• Align [Company] with a high-energy festive experience at MUJ
+• Strong emotional connection leading to higher recall value
 
 5. Data and Lead Generation Opportunities
-- QR-based engagement systems
-- Contests, giveaways, and registrations
-- Direct audience data capture as per optional integrations
+• QR-based engagement systems
+• Contests, giveaways, and registrations
+• Direct audience data capture as per optional integrations
 
 Sponsorship Structure
 
 Title Sponsor — Rs. 1,50,000 (Exclusive)
-- "Garuda Dandiya Night 2026 Powered by [Company]"
-- Maximum visibility across all platforms
-- Prime branding on stage, entry gate, and main arena
-- Dedicated speaking and announcement slots
-- Premium stall location with exclusive activation rights
+• "Garuda Dandiya Night 2026 Powered by [Company]"
+• Maximum visibility across all platforms
+• Prime branding on stage, entry gate, and main arena
+• Dedicated speaking and announcement slots
+• Premium stall location with exclusive activation rights
 
 Co-Sponsor — Rs. 95,000
-- Strong co-branding across all creatives
-- High-visibility placements across digital and offline channels
-- On-ground engagement rights
+• Strong co-branding across all creatives
+• High-visibility placements across digital and offline channels
+• On-ground engagement rights
 
 Partner Sponsor — Rs. 75,000
-- Logo placement across major promotions
-- On-stage mentions throughout the event
-- Branding at key event locations
+• Logo placement across major promotions
+• On-stage mentions throughout the event
+• Branding at key event locations
 
 Associate Sponsor / Zone Sponsor
 Sponsor specific areas such as the Dance Arena, Selfie Booth, Entry Gate, Merchandise Zone, or Competition Prizes with selective visibility packages.
 
 Unique Branding Opportunities
 
-- Branded Dandiya sticks distributed to all attendees — a high recall item
-- LED screen advertisements during the event
-- Photo booths with full brand integration
-- Exclusive branded zones within the event
-- Live stage integration and host mentions
-- Customized contests powered by [Company]
+• Branded Dandiya sticks distributed to all attendees — a high recall item
+• LED screen advertisements during the event
+• Photo booths with full brand integration
+• Exclusive branded zones within the event
+• Live stage integration and host mentions
+• Customized contests powered by [Company]
 
 Execution Excellence
 
 Club Garuda ensures:
-- Structured event management system with dedicated vertical leads
-- Separate teams for operations, marketing, and logistics
-- Strict security and discipline protocols coordinated with university administration
-- Smooth sponsor coordination for all deliverables with regular updates
+• Structured event management system with dedicated vertical leads
+• Separate teams for operations, marketing, and logistics
+• Strict security and discipline protocols coordinated with university administration
+• Smooth sponsor coordination for all deliverables with regular updates
 
 
 Why Partner with Club Garuda?
 
-- Proven track record of successful large-scale events at Manipal University Jaipur
-- Strong organizational structure with 50+ active core members
-- High execution discipline and brand professionalism
-- Focus on long-term partnerships, not one-time sponsorships
+• Proven track record of successful large-scale events at Manipal University Jaipur
+• Strong organizational structure with 50+ active core members
+• High execution discipline and brand professionalism
+• Focus on long-term partnerships, not one-time sponsorships
 
 
 Next Steps

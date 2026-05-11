@@ -172,7 +172,7 @@ I hope this message finds you well.
 
 I am writing to present an exclusive high-impact sponsorship opportunity for our flagship cultural event — Garuda Dandiya Night 2026, one of the largest and most anticipated celebrations on campus, designed at a mega scale with 10,000+ expected footfall and 2,00,000+ consolidated digital and on-ground reach.
 
-This is not just an event — it is a large-scale cultural production, blending tradition, entertainment, and strategic brand engagement.
+This is not just an event:it is a large-scale cultural production, blending tradition, entertainment, and strategic brand engagement.
 
 About Garuda Dandiya Night 2026
 
@@ -191,7 +191,7 @@ Scale and Impact Metrics
 
 Physical Footfall
 • 10,000+ attendees
-• Students from multiple colleges and institutions across Rajasthan
+• Students and faculties of different age groups
 • Highly active, socially engaged youth audience
 
 Digital and Promotional Reach
@@ -255,7 +255,7 @@ Sponsor specific areas such as the Dance Arena, Selfie Booth, Entry Gate, Mercha
 
 Unique Branding Opportunities
 
-• Branded Dandiya sticks distributed to all attendees — a high recall item
+• Branded Dandiya sticks distributed to all attendees: a high recall item
 • LED screen advertisements during the event
 • Photo booths with full brand integration
 • Exclusive branded zones within the event
@@ -286,9 +286,9 @@ We would be delighted to share a customized sponsorship deck and discuss how we 
 Thank you for considering this collaboration. We look forward to partnering with ${c} to create a grand, impactful, and unforgettable Garuda Dandiya Night 2026.
 
 Warm regards,
-
 ${senderName}
-Club Garuda — Manipal University Jaipur
+Club Garuda 
+Manipal University Jaipur
 garuda.club@muj.manipal.edu
 
 "10,000 people. One night. Infinite energy. Maximum brand impact."`

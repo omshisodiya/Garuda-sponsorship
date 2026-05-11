@@ -9,6 +9,7 @@ import {
   AlertTriangle, ArrowUpRight, RefreshCw,
   Database, GitBranch, PhoneCall, MessageSquare,
   IndianRupee, ChevronRight, X, Bell, Send, Users2,
+  LogOut, UserX,
 } from "lucide-react"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -594,6 +595,8 @@ export default function SuperAdminDashboard() {
     logoutAt: string | null; durationMins: number | null; ip: string
   }
   const [sessions, setSessions] = useState<SessionEntry[]>([])
+  const [forceLogoutingAll,  setForceLogoutingAll]  = useState(false)
+  const [forceLogoutingUser, setForceLogoutingUser] = useState<string | null>(null)
 
   type NotifHistory = {
     id: number; title: string; body: string; url?: string
@@ -724,6 +727,30 @@ export default function SuperAdminDashboard() {
 
     return out.slice(0, 3)
   }, [leads])
+
+  async function handleForceLogoutAll() {
+    if (!confirm("Force-logout ALL active sessions across every device?")) return
+    setForceLogoutingAll(true)
+    try {
+      await fetch("/api/auth/force-logout-all", { method: "POST" })
+    } finally {
+      setForceLogoutingAll(false)
+    }
+  }
+
+  async function handleForceLogoutUser(userId: string, userName: string) {
+    if (!confirm(`Force-logout ${userName}?`)) return
+    setForceLogoutingUser(userId)
+    try {
+      await fetch("/api/auth/force-logout-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, userName }),
+      })
+    } finally {
+      setForceLogoutingUser(null)
+    }
+  }
 
   async function loadLeads() {
     try {
@@ -1970,9 +1997,21 @@ export default function SuperAdminDashboard() {
             <div className="g-label" style={{ marginBottom: 4 }}>Superadmin Only</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1)" }}>Login History</div>
           </div>
-          <span style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-            {sessions.length} sessions recorded
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+              {sessions.length} sessions recorded
+            </span>
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={handleForceLogoutAll}
+              disabled={forceLogoutingAll}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: "var(--r-md)", background: "var(--danger-bg)", border: "1px solid var(--danger-edge)", color: "var(--danger)", fontSize: 11, fontWeight: 700, cursor: forceLogoutingAll ? "not-allowed" : "pointer", opacity: forceLogoutingAll ? 0.6 : 1, fontFamily: "inherit" }}
+              title="Force-logout every active session on all devices"
+            >
+              <LogOut size={12} />
+              {forceLogoutingAll ? "Logging out…" : "Force Logout All"}
+            </motion.button>
+          </div>
         </div>
 
         {sessions.length === 0 ? (
@@ -1990,31 +2029,49 @@ export default function SuperAdminDashboard() {
                   <th>Duration</th>
                   <th>IP / Source</th>
                   <th>Status</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {sessions.map((s, i) => (
-                  <tr key={i}>
-                    <td style={{ fontWeight: 700, color: "var(--text-1)" }}>{s.userName}</td>
-                    <td style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-2)" }}>
-                      {fmtTime(s.loginAt)}
-                    </td>
-                    <td style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-2)" }}>
-                      {s.logoutAt ? fmtTime(s.logoutAt) : "—"}
-                    </td>
-                    <td style={{ fontWeight: 600, color: s.durationMins !== null ? "var(--text-1)" : "var(--text-3)" }}>
-                      {fmtDuration(s.durationMins)}
-                    </td>
-                    <td style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                      {s.ip || "unknown"}
-                    </td>
-                    <td>
-                      {s.logoutAt
-                        ? <span className="badge badge-green" style={{ fontSize: 9 }}>Logged out</span>
-                        : <span className="badge badge-orange" style={{ fontSize: 9 }}>Session ended</span>}
-                    </td>
-                  </tr>
-                ))}
+                {sessions.map((s, i) => {
+                  const isActive = !s.logoutAt
+                  return (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 700, color: "var(--text-1)" }}>{s.userName}</td>
+                      <td style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-2)" }}>
+                        {fmtTime(s.loginAt)}
+                      </td>
+                      <td style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-2)" }}>
+                        {s.logoutAt ? fmtTime(s.logoutAt) : "—"}
+                      </td>
+                      <td style={{ fontWeight: 600, color: s.durationMins !== null ? "var(--text-1)" : "var(--text-3)" }}>
+                        {fmtDuration(s.durationMins)}
+                      </td>
+                      <td style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                        {s.ip || "unknown"}
+                      </td>
+                      <td>
+                        {s.logoutAt
+                          ? <span className="badge badge-green" style={{ fontSize: 9 }}>Logged out</span>
+                          : <span className="badge badge-orange" style={{ fontSize: 9 }}>Active</span>}
+                      </td>
+                      <td>
+                        {isActive && (
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleForceLogoutUser(s.userId, s.userName)}
+                            disabled={forceLogoutingUser === s.userId}
+                            title={`Force-logout ${s.userName}`}
+                            style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: "var(--r-sm)", background: "var(--danger-bg)", border: "1px solid var(--danger-edge)", color: "var(--danger)", fontSize: 10, fontWeight: 700, cursor: forceLogoutingUser === s.userId ? "not-allowed" : "pointer", opacity: forceLogoutingUser === s.userId ? 0.5 : 1, fontFamily: "inherit" }}
+                          >
+                            <UserX size={11} />
+                            {forceLogoutingUser === s.userId ? "…" : "Logout"}
+                          </motion.button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

@@ -64,6 +64,14 @@ async function _init(): Promise<void> {
     )
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS garuda_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `
+
   const countRows = await sql`SELECT COUNT(*)::int AS count FROM garuda_users`
   const count = (countRows[0]?.count as number) ?? 0
   if (count === 0) {
@@ -307,6 +315,36 @@ export async function getAudit(limit = 50): Promise<AuditEntry[]> {
     LIMIT ${limit}
   `
   return rows as unknown as AuditEntry[]
+}
+
+// ── Force-logout settings ──────────────────────────────────────────────────────
+// Keys stored in garuda_settings:
+//   "force_logout_all"           → logs out every user whose token iat is before this
+//   "force_logout_user_<userId>" → logs out a specific user
+
+export async function setForceLogout(key: string): Promise<void> {
+  await ensureInit()
+  await db()`
+    INSERT INTO garuda_settings (key, value, updated_at)
+    VALUES (${key}, now()::text, now())
+    ON CONFLICT (key) DO UPDATE SET value = now()::text, updated_at = now()
+  `
+}
+
+export async function getForceLogoutTimestamps(userId: string): Promise<{ global: string | null; user: string | null }> {
+  await ensureInit()
+  const globalKey = "force_logout_all"
+  const userKey   = `force_logout_user_${userId}`
+  const rows = await db()`
+    SELECT key, value FROM garuda_settings WHERE key IN (${globalKey}, ${userKey})
+  `
+  let global: string | null = null
+  let user:   string | null = null
+  for (const r of rows) {
+    if (r.key === globalKey) global = String(r.value)
+    if (r.key === userKey)   user   = String(r.value)
+  }
+  return { global, user }
 }
 
 // ── Public shape (no password_hash) ──────────────────────────────────────────

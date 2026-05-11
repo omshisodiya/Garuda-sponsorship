@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSessionFromCookies } from "@/app/lib/server/auth"
-import { getUserById, toPublic } from "@/app/lib/server/store"
+import { getUserById, toPublic, getForceLogoutTimestamps } from "@/app/lib/server/store"
 
 export async function GET() {
   const session = await getSessionFromCookies()
@@ -8,9 +8,21 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  const user = await getUserById(session.sub)
+  const [user, { global: globalTs, user: userTs }] = await Promise.all([
+    getUserById(session.sub),
+    getForceLogoutTimestamps(session.sub),
+  ])
+
   if (!user || user.status === "disabled") {
     return NextResponse.json({ error: "User not found or disabled" }, { status: 401 })
+  }
+
+  // iat is seconds; force_logout timestamps are ISO strings — compare in ms
+  const iatMs     = (session.iat ?? 0) * 1000
+  const globalMs  = globalTs ? new Date(globalTs).getTime() : 0
+  const userMs    = userTs   ? new Date(userTs).getTime()   : 0
+  if (iatMs < globalMs || iatMs < userMs) {
+    return NextResponse.json({ error: "Session invalidated by admin" }, { status: 401 })
   }
 
   return NextResponse.json({ user: toPublic(user) })

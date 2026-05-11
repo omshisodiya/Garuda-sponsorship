@@ -218,6 +218,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     localStorage.setItem("g_theme", theme)
   }, [theme])
 
+  // Poll /api/auth/me every 60s — detects server-side force-logout by superadmin
+  useEffect(() => {
+    if (noLayout) return
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch("/api/auth/me")
+        if (res.status === 401) {
+          sessionStorage.removeItem("g_role")
+          sessionStorage.removeItem("g_name")
+          window.location.href = "/login"
+        }
+      } catch { /* network blip — ignore, next tick will retry */ }
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [noLayout])
+
   // Idle detection — auto-logout after 10 min of no activity across ALL open tabs
   useEffect(() => {
     if (noLayout) return

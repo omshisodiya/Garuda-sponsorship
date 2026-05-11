@@ -13,6 +13,7 @@ export type JWTPayload = {
   username: string
   name: string
   role: "superadmin" | "admin" | "team"
+  iat?: number  // issued-at (Unix seconds) — set automatically by signToken
 }
 
 // ── PASSWORD HASHING (node:crypto, no external packages) ──

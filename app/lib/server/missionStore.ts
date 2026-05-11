@@ -1,5 +1,14 @@
 import { db, type Row } from "./db"
 
+// ── XP Decay config ───────────────────────────────────────────────────────────
+// Mission XP decays 15% every 7 days after verification, down to a 50% floor.
+// e.g. 600 XP → 510 (wk1) → 433 (wk2) → 368 (wk3) → 313 (wk4) → 300 (floor)
+export const XP_DECAY = {
+  intervalDays:      7,    // decay fires every N days
+  ratePerInterval:   0.85, // multiplier per interval (1 − 0.15 = 15% reduction)
+  floor:             0.50, // minimum fraction of original XP retained
+} as const
+
 export type MissionClaim = {
   id:               string
   mission_id:       string
@@ -109,7 +118,12 @@ export async function getPendingVerifications(): Promise<MissionClaim[]> {
 export async function getUserMissionXP(userId: string): Promise<number> {
   await ensureInit()
   const rows = await db()`
-    SELECT COALESCE(SUM(mission_points), 0)::int AS xp
+    SELECT COALESCE(SUM(
+      FLOOR(mission_points * GREATEST(
+        0.50,
+        POWER(0.85, FLOOR(EXTRACT(EPOCH FROM (NOW() - verified_at)) / 604800))
+      ))
+    ), 0)::int AS xp
     FROM garuda_mission_claims
     WHERE user_id = ${userId} AND status = 'verified'
   `
@@ -119,7 +133,13 @@ export async function getUserMissionXP(userId: string): Promise<number> {
 export async function getAllUsersXP(): Promise<Record<string, number>> {
   await ensureInit()
   const rows = await db()`
-    SELECT user_id, COALESCE(SUM(mission_points), 0)::int AS xp
+    SELECT user_id,
+      COALESCE(SUM(
+        FLOOR(mission_points * GREATEST(
+          0.50,
+          POWER(0.85, FLOOR(EXTRACT(EPOCH FROM (NOW() - verified_at)) / 604800))
+        ))
+      ), 0)::int AS xp
     FROM garuda_mission_claims
     WHERE status = 'verified'
     GROUP BY user_id
@@ -127,6 +147,22 @@ export async function getAllUsersXP(): Promise<Record<string, number>> {
   const out: Record<string, number> = {}
   for (const r of rows) out[String(r.user_id)] = (r.xp as number) ?? 0
   return out
+}
+
+// Returns each verified claim with its current effective (decayed) XP
+export async function getUserMissionClaims(userId: string): Promise<Array<MissionClaim & { effectiveXp: number }>> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT *,
+      FLOOR(mission_points * GREATEST(
+        0.50,
+        POWER(0.85, FLOOR(EXTRACT(EPOCH FROM (NOW() - verified_at)) / 604800))
+      ))::int AS effective_xp
+    FROM garuda_mission_claims
+    WHERE user_id = ${userId} AND status = 'verified'
+    ORDER BY verified_at DESC
+  `
+  return rows.map(r => ({ ...rowToClaim(r as Row), effectiveXp: (r.effective_xp as number) ?? 0 }))
 }
 
 export async function getClaimForVerification(missionId: string, userId: string): Promise<MissionClaim | null> {

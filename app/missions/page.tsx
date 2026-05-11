@@ -174,9 +174,9 @@ function xpForLead(lead: Lead): number {
   return 0
 }
 function xpTier(xp: number): { label: string; color: string } {
-  if (xp >= 500) return { label: "Garuda",     color: "#C9A24B" }
-  if (xp >= 300) return { label: "Closer",     color: "#4ADE80" }
-  if (xp >= 150) return { label: "Hunter",     color: "#60A5FA" }
+  if (xp >= 700) return { label: "Garuda",     color: "#C9A24B" }
+  if (xp >= 450) return { label: "Closer",     color: "#4ADE80" }
+  if (xp >= 200) return { label: "Hunter",     color: "#60A5FA" }
   if (xp >  0)   return { label: "Apprentice", color: "#A78BFA" }
   return              { label: "Unranked",     color: "var(--text-3)" }
 }
@@ -696,9 +696,12 @@ export default function MissionsPage() {
 
           {/* Leaderboard with category tabs */}
           <motion.div initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="panel">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
               <div className="g-label">XP Leaderboard</div>
               <span style={{ fontSize: 9, color: "var(--text-3)", background: "rgba(201,162,75,0.07)", border: "1px solid rgba(201,162,75,0.15)", padding: "2px 7px", borderRadius: 10 }}>Live</span>
+            </div>
+            <div style={{ fontSize: 9, color: "var(--text-3)", background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: 6, padding: "4px 8px", marginBottom: 10, lineHeight: 1.5 }}>
+              Mission XP decays <strong style={{ color: "#F87171" }}>−15% every 7 days</strong> (floor 50%) · Stay active to hold your rank · Garuda requires 700+ XP
             </div>
             {/* Category tabs */}
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>

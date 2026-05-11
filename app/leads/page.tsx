@@ -328,12 +328,12 @@ function EmailComposeModal({
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(12px)", zIndex: 9996, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(12px)", zIndex: 9996, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}
       onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 16 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}
         className="panel"
-        style={{ width: "min(780px, 100%)", maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}
+        style={{ width: "100%", maxWidth: 780, maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}

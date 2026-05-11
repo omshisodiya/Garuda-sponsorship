@@ -275,14 +275,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       if (e.key === IDLE_LS) reset(false)
     }
 
+    const onActivity = () => reset(true)
+
     resetIdleRef.current = reset
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"] as const
-    events.forEach(e => window.addEventListener(e, reset, { passive: true }))
+    events.forEach(e => window.addEventListener(e, onActivity, { passive: true }))
     window.addEventListener("storage", onStorage)
     reset()
 
     return () => {
-      events.forEach(e => window.removeEventListener(e, reset))
+      events.forEach(e => window.removeEventListener(e, onActivity))
       window.removeEventListener("storage", onStorage)
       if (idleTimerRef.current)  clearTimeout(idleTimerRef.current)
       if (warnTimerRef.current)  clearInterval(warnTimerRef.current)

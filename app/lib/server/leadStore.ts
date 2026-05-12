@@ -98,7 +98,12 @@ function newLeadId(): string {
 // ── Read ──────────────────────────────────────────────────────────────────────
 export async function getAllLeads(): Promise<Lead[]> {
   await ensureInit()
-  const rows = await db()`SELECT * FROM garuda_leads ORDER BY created_at DESC`
+  const rows = await db()`
+    SELECT id, company, poc_name, poc_email, poc_phone, category, status, stage,
+           assigned_to, assigned_by, assigned_by_role, deal_value, probability,
+           notes, last_activity, created_at, created_by
+    FROM garuda_leads ORDER BY created_at DESC
+  `
   return rows.map(r => rowToLead(r as Row))
 }
 
@@ -111,7 +116,10 @@ export async function getLeadById(id: string): Promise<Lead | null> {
 export async function getLeadsByAssignee(userId: string): Promise<Lead[]> {
   await ensureInit()
   const rows = await db()`
-    SELECT * FROM garuda_leads WHERE assigned_to = ${userId} ORDER BY created_at DESC
+    SELECT id, company, poc_name, poc_email, poc_phone, category, status, stage,
+           assigned_to, assigned_by, assigned_by_role, deal_value, probability,
+           notes, last_activity, created_at, created_by
+    FROM garuda_leads WHERE assigned_to = ${userId} ORDER BY created_at DESC
   `
   return rows.map(r => rowToLead(r as Row))
 }

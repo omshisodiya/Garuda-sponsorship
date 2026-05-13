@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Search, GitBranch, CheckSquare, Square, Loader, Shuffle } from "lucide-react"
+import { Search, GitBranch, CheckSquare, Square, Loader, Shuffle, Filter } from "lucide-react"
 import type { Lead } from "../lib/data"
 
 // ── DisplayUser helpers ───────────────────────────────────────────────────────
@@ -56,7 +56,8 @@ export default function AssignPage() {
   const [search,     setSearch]     = useState("")
   const [selected,   setSelected]   = useState<Set<string>>(new Set())
   const [bulkTarget, setBulkTarget] = useState<string>("")
-  const [distributing, setDistributing] = useState(false)
+  const [distributing,    setDistributing]    = useState(false)
+  const [unassignedOnly,  setUnassignedOnly]  = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -83,11 +84,12 @@ export default function AssignPage() {
   }, [users])
 
   const filtered = useMemo(() =>
-    leads.filter(l =>
-      [l.company, l.poc_name, l.category, l.status].join(" ")
+    leads.filter(l => {
+      if (unassignedOnly && l.assigned_to !== null) return false
+      return [l.company, l.poc_name, l.category, l.status].join(" ")
         .toLowerCase().includes(search.toLowerCase())
-    ),
-    [leads, search]
+    }),
+    [leads, search, unassignedOnly]
   )
 
   async function assign(leadId: string, memberId: string | "null") {
@@ -252,6 +254,28 @@ export default function AssignPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search leads…"
             style={{ flex: 1, padding: "10px 0", background: "transparent", border: "none", color: "var(--text-1)", fontSize: 12, fontFamily: "inherit", outline: "none" }} />
         </div>
+
+        <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={() => setUnassignedOnly(o => !o)}
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "9px 15px", borderRadius: "var(--r-md)",
+            background: unassignedOnly ? "rgba(201,162,75,0.12)" : "rgba(0,0,0,0.3)",
+            border: `1px solid ${unassignedOnly ? "rgba(201,162,75,0.5)" : "var(--brand-edge)"}`,
+            color: unassignedOnly ? "#C9A24B" : "var(--text-2)",
+            fontSize: 11, fontWeight: unassignedOnly ? 700 : 500,
+            cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+          }}
+        >
+          <Filter size={12} strokeWidth={2} />
+          Unassigned
+          {unassigned > 0 && (
+            <span style={{ padding: "1px 6px", borderRadius: 100, background: unassignedOnly ? "rgba(201,162,75,0.25)" : "rgba(255,255,255,0.06)", border: `1px solid ${unassignedOnly ? "rgba(201,162,75,0.4)" : "rgba(255,255,255,0.08)"}`, fontSize: 10, fontWeight: 700, color: unassignedOnly ? "#C9A24B" : "var(--text-3)" }}>
+              {unassigned}
+            </span>
+          )}
+        </motion.button>
 
         {selected.size > 0 && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}

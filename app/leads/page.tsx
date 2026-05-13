@@ -159,12 +159,12 @@ function exportPerMember(leads: Lead[], users: DisplayUser[]) {
   URL.revokeObjectURL(url)
 }
 
-// ── Email compose ─────────────────────────────────────────────────────────────
-function buildEmail(lead: Lead, senderName: string): { subject: string; body: string } {
-  const c = lead.company
-  const n = lead.poc_name
-  const subject = `Sponsorship Collaboration | Dandiya Night '26 | Club Garuda, MUJ`
-  const body = `Dear ${n},
+// ── Email templates ───────────────────────────────────────────────────────────
+const EMAIL_TEMPLATES = {
+  initial: {
+    label: "Initial Outreach",
+    subject: `Sponsorship Collaboration | Dandiya Night '26 | Club Garuda, MUJ`,
+    body: `Dear [Contact Name],
 
 Greetings from Club Garuda, Manipal University Jaipur!
 
@@ -172,7 +172,7 @@ I hope this message finds you well.
 
 I am writing to present an exclusive high-impact sponsorship opportunity for our flagship cultural event — Garuda Dandiya Night 2026, one of the largest and most anticipated celebrations on campus, designed at a mega scale with 10,000+ expected footfall and 2,00,000+ consolidated digital and on-ground reach.
 
-This is not just an event:it is a large-scale cultural production, blending tradition, entertainment, and strategic brand engagement.
+This is not just an event — it is a large-scale cultural production, blending tradition, entertainment, and strategic brand engagement.
 
 About Garuda Dandiya Night 2026
 
@@ -206,7 +206,7 @@ Engagement Lifecycle
 • Live event engagement
 • Post-event digital amplification through after-movies and highlights
 
-Strategic Value for ${c}
+Strategic Value for [Company]
 
 1. Massive Brand Exposure
 • Logo integration across all digital and offline creatives
@@ -223,7 +223,7 @@ Strategic Value for ${c}
 • Interactive brand experiences within the event space
 
 4. Premium Cultural Association
-• Align ${c} with a high-energy festive experience at MUJ
+• Align [Company] with a high-energy festive experience at MUJ
 • Strong emotional connection leading to higher recall value
 
 5. Data and Lead Generation Opportunities
@@ -234,7 +234,7 @@ Strategic Value for ${c}
 Sponsorship Structure
 
 Title Sponsor — Rs. 1,50,000 (Exclusive)
-• "Garuda Dandiya Night 2026 Powered by ${c}"
+• "Garuda Dandiya Night 2026 Powered by [Company]"
 • Maximum visibility across all platforms
 • Prime branding on stage, entry gate, and main arena
 • Dedicated speaking and announcement slots
@@ -255,12 +255,12 @@ Sponsor specific areas such as the Dance Arena, Selfie Booth, Entry Gate, Mercha
 
 Unique Branding Opportunities
 
-• Branded Dandiya sticks distributed to all attendees: a high recall item
+• Branded Dandiya sticks distributed to all attendees — a high recall item
 • LED screen advertisements during the event
 • Photo booths with full brand integration
 • Exclusive branded zones within the event
 • Live stage integration and host mentions
-• Customized contests powered by ${c}
+• Customized contests powered by [Company]
 
 Execution Excellence
 
@@ -283,25 +283,169 @@ Next Steps
 
 We would be delighted to share a customized sponsorship deck and discuss how we can align this opportunity with your brand objectives. Please let us know a convenient time for a quick call or meeting.
 
-Thank you for considering this collaboration. We look forward to partnering with ${c} to create a grand, impactful, and unforgettable Garuda Dandiya Night 2026.
+Thank you for considering this collaboration. We look forward to partnering with [Company] to create a grand, impactful, and unforgettable Garuda Dandiya Night 2026.
 
 Warm regards,
-${senderName}
-Club Garuda 
+[Your Name]
+Club Garuda
 Manipal University Jaipur
 garuda.club@muj.manipal.edu
 
-"10,000 people. One night. Infinite energy. Maximum brand impact."`
+"10,000 people. One night. Infinite energy. Maximum brand impact."`,
+  },
+  followup: {
+    label: "Follow-Up",
+    subject: `Following Up | Sponsorship Proposal | Dandiya Night '26`,
+    body: `Dear [Contact Name],
+
+I hope you are doing well.
+
+I wanted to follow up on my earlier message regarding a sponsorship collaboration for Dandiya Night '26.
+
+I understand you are busy, so I will keep this brief — we have a few sponsorship slots remaining and I wanted to make sure [Company] has the opportunity to be part of this event before they fill up.
+
+Quick reminder of what makes this a standout opportunity:
+• 10,000+ attendees — Jaipur's top engineering and management students at a single venue
+• 2,00,000+ cumulative reach on Dandiya Night reels and social media promotions
+• [Company]'s category exclusivity is still available
+• Flexible sponsorship packages and payment terms
+
+Would you be open to a quick 15-minute call this week?
+
+Alternatively, I can send our sponsorship deck directly to your WhatsApp for a quicker review.
+
+Thank you for your time.
+
+Warm regards,
+[Your Name]
+Sponsorship Team
+Club Garuda
+Manipal University Jaipur
+garuda.club@muj.manipal.edu`,
+  },
+  proposal: {
+    label: "Proposal Send",
+    subject: `Sponsorship Proposal | [Company] x Dandiya Night '26`,
+    body: `Dear [Contact Name],
+
+Thank you for your interest in partnering with Club Garuda.
+
+As discussed, please find attached our custom sponsorship proposal prepared specifically for [Company].
+
+EVENT SNAPSHOT
+• 10,000+ attendees — concentrated Gen Z audience of engineering and management students
+• 2,00,000+ cumulative social media reach on Dandiya Night reels and digital campaigns
+• Live DJ, celebrity performances, and curated cultural showcases
+• Dedicated on-ground brand activation zones
+
+PROPOSED PACKAGE: [TIER NAME] Sponsorship (₹[Amount])
+
+KEY DELIVERABLES
+• Logo on all event banners and backdrops
+• 30-second brand slot at opening ceremony
+• Dedicated activation booth (10x10 ft)
+• Social media mentions across 3 platforms (15+ posts)
+• Featured branding across all Dandiya Night reels and digital content
+• Post-event report with reach and engagement metrics
+
+NEXT STEPS
+1. Review the attached proposal
+2. Share any customization requests
+3. Sign LOI to confirm partnership
+4. Share brand assets for design team
+
+I am available for a call at your convenience to walk you through the proposal.
+
+Best regards,
+[Your Name]
+Sponsorship Team
+Club Garuda
+Manipal University Jaipur
+garuda.club@muj.manipal.edu`,
+  },
+  negotiation: {
+    label: "Negotiation Close",
+    subject: `Finalising Partnership | [Company] x Dandiya Night '26`,
+    body: `Dear [Contact Name],
+
+Thank you for the productive conversation earlier.
+
+I wanted to follow up with a revised package that reflects our discussion:
+
+REVISED OFFER FOR [Company]
+• Sponsorship Tier: [TIER NAME] at ₹[Amount]
+• Payment: 50% advance, 50% post-event
+• Category Exclusivity: Included
+
+As a reminder of the platform you will be associating with:
+• 10,000+ attendees at a single high-energy venue
+• 2,00,000+ cumulative reach on Dandiya Night reels and event promotions
+• Authentic campus association with MUJ's most anticipated cultural event
+
+We are confident this partnership will deliver exceptional ROI for [Company]. To move forward, I just need your confirmation by [DATE] to reserve your slot before the deadline.
+
+Looking forward to welcoming [Company] as our valued partner.
+
+Warm regards,
+[Your Name]
+Sponsorship Team
+Club Garuda
+Manipal University Jaipur
+garuda.club@muj.manipal.edu`,
+  },
+} as const
+
+type EmailTemplateKey = keyof typeof EMAIL_TEMPLATES
+
+function buildTemplatedEmail(
+  key: EmailTemplateKey,
+  lead: Lead,
+  senderName: string
+): { subject: string; body: string } {
+  const t = EMAIL_TEMPLATES[key]
+  const tier = lead.deal_value >= 150000 ? "Title Sponsor"
+    : lead.deal_value >= 95000  ? "Co-Sponsor"
+    : lead.deal_value >= 75000  ? "Partner Sponsor"
+    : "Associate Sponsor"
+  const amount = lead.deal_value > 0 ? lead.deal_value.toLocaleString("en-IN") : "Custom"
+  const deadline = new Date(Date.now() + 3 * 86400000).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+
+  const pairs: [string, string][] = [
+    ["[Contact Name]",  lead.poc_name  || "Sir/Ma'am"],
+    ["[Company]",       lead.company],
+    ["[Your Name]",     senderName],
+    ["[Contact Number]",lead.poc_phone || "[Contact Number]"],
+    ["[TIER NAME]",     tier],
+    ["[TIER]",          tier],
+    ["[Amount]",        amount],
+    ["[DATE]",          deadline],
+  ]
+
+  let subject: string = t.subject
+  let body:    string = t.body
+  for (const [placeholder, value] of pairs) {
+    subject = subject.replaceAll(placeholder, value)
+    body    = body.replaceAll(placeholder, value)
+  }
   return { subject, body }
 }
 
+// ── Email compose modal ───────────────────────────────────────────────────────
 function EmailComposeModal({
   lead, senderName, onClose,
 }: { lead: Lead; senderName: string; onClose: () => void }) {
-  const { subject: initSubject, body: initBody } = buildEmail(lead, senderName)
-  const [subject, setSubject] = useState(initSubject)
-  const [body, setBody]       = useState(initBody)
-  const [copied, setCopied] = useState(false)
+  const [activeTemplate, setActiveTemplate] = useState<EmailTemplateKey>("initial")
+  const init = buildTemplatedEmail("initial", lead, senderName)
+  const [subject, setSubject] = useState(init.subject)
+  const [body,    setBody]    = useState(init.body)
+  const [copied,  setCopied]  = useState(false)
+
+  function selectTemplate(key: EmailTemplateKey) {
+    setActiveTemplate(key)
+    const { subject: s, body: b } = buildTemplatedEmail(key, lead, senderName)
+    setSubject(s)
+    setBody(b)
+  }
 
   function sendGmail() {
     window.open(
@@ -333,11 +477,11 @@ function EmailComposeModal({
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 16 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}
         className="panel"
-        style={{ width: "100%", maxWidth: 780, maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}
+        style={{ width: "100%", maxWidth: 820, maxHeight: "92vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-1)" }}>Compose Sponsorship Email</div>
             <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>
@@ -349,11 +493,22 @@ function EmailComposeModal({
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", padding: 4 }}><X size={15} /></button>
         </div>
 
+        {/* Template selector */}
+        <div style={{ padding: "10px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.09em", textTransform: "uppercase", alignSelf: "center", marginRight: 4, fontWeight: 600 }}>Template</span>
+          {(Object.keys(EMAIL_TEMPLATES) as EmailTemplateKey[]).map(key => (
+            <button key={key} onClick={() => selectTemplate(key)}
+              style={{ padding: "5px 12px", borderRadius: "var(--r-sm)", border: `1px solid ${activeTemplate === key ? "rgba(201,162,75,0.45)" : "rgba(201,162,75,0.12)"}`, background: activeTemplate === key ? "rgba(201,162,75,0.1)" : "transparent", color: activeTemplate === key ? "#C9A24B" : "var(--text-3)", fontSize: 10, fontWeight: activeTemplate === key ? 700 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all 0.14s" }}>
+              {EMAIL_TEMPLATES[key].label}
+            </button>
+          ))}
+        </div>
+
         {/* Fields */}
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", flexDirection: "column", gap: 7, flexShrink: 0 }}>
+        <div style={{ padding: "10px 20px", borderBottom: "1px solid var(--border-1)", display: "flex", flexDirection: "column", gap: 7, flexShrink: 0 }}>
           {[
-            { label: "To",  value: lead.poc_email, editable: false, gold: false },
-            { label: "CC",  value: CLUB.email,      editable: false, gold: true  },
+            { label: "To", value: lead.poc_email, gold: false },
+            { label: "CC", value: CLUB.email,     gold: true  },
           ].map(({ label, value, gold }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 10, color: "var(--text-3)", width: 22, flexShrink: 0, fontWeight: 600 }}>{label}</span>

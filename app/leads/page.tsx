@@ -420,7 +420,15 @@ function DetailPanel({
   )
   const [saving,         setSaving]         = useState(false)
   const [flash,          setFlash]          = useState("")
+  const [fullScreenshots, setFullScreenshots] = useState<Record<string, string>>(lead.screenshots ?? {})
   const screenshotRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch(`/api/leads/${lead.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.lead?.screenshots) setFullScreenshots(data.lead.screenshots) })
+      .catch(() => {})
+  }, [lead.id])
 
   // Determine if current user can edit this lead
   const canEdit = currentUser
@@ -479,7 +487,7 @@ function DetailPanel({
       img.src = url
     })
     const statusKey   = editStatus
-    const screenshots = { ...(lead.screenshots ?? {}), [statusKey]: base64 }
+    const screenshots = { ...fullScreenshots, [statusKey]: base64 }
     try {
       const res = await fetch(`/api/leads/${lead.id}`, {
         method:  "PATCH",
@@ -488,6 +496,7 @@ function DetailPanel({
       })
       if (res.ok) {
         const { lead: updated } = await res.json()
+        setFullScreenshots(updated.screenshots ?? screenshots)
         onUpdate(updated)
         setFlash("Screenshot uploaded!")
         setTimeout(() => setFlash(""), 2500)
@@ -495,8 +504,7 @@ function DetailPanel({
     } catch { /* silent */ }
   }
 
-  const screenshots = lead.screenshots ?? {}
-  const screenshotEntries = Object.entries(screenshots)
+  const screenshotEntries = Object.entries(fullScreenshots)
 
   return (
     <>

@@ -644,6 +644,7 @@ function DetailPanel({
   onClose,
   onUpdate,
   onCompose,
+  onDelete,
 }: {
   lead: Lead
   users: DisplayUser[]
@@ -651,6 +652,7 @@ function DetailPanel({
   onClose: () => void
   onUpdate: (updated: Lead) => void
   onCompose: (lead: Lead) => void
+  onDelete: (id: string) => void
 }) {
   const [editStatus,     setEditStatus]     = useState<LeadStatus>(lead.status)
   const [dealPreset,     setDealPreset]     = useState<number>(
@@ -664,6 +666,12 @@ function DetailPanel({
   const [fullScreenshots, setFullScreenshots] = useState<Record<string, string>>(lead.screenshots ?? {})
   const [flagModalOpen,   setFlagModalOpen]   = useState(false)
   const [unflagging,      setUnflagging]      = useState(false)
+  const [editingContact,  setEditingContact]  = useState(false)
+  const [editPocName,     setEditPocName]     = useState(lead.poc_name)
+  const [editPocEmail,    setEditPocEmail]    = useState(lead.poc_email)
+  const [editPocPhone,    setEditPocPhone]    = useState(lead.poc_phone)
+  const [savingContact,   setSavingContact]   = useState(false)
+  const [deleting,        setDeleting]        = useState(false)
   const screenshotRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -688,6 +696,13 @@ function DetailPanel({
     ? currentUser.role === "superadmin" || lead.flagged_by === currentUser.id
     : false
 
+  // admin/superadmin can edit contact details on any flagged lead
+  const canEditContact = !!lead.flag_type && (
+    currentUser?.role === "superadmin" || currentUser?.role === "admin"
+  )
+  // only superadmin can delete flagged leads
+  const canDeleteFlagged = !!lead.flag_type && currentUser?.role === "superadmin"
+
   async function handleUnflag() {
     setUnflagging(true)
     try {
@@ -699,6 +714,33 @@ function DetailPanel({
         setTimeout(() => setFlash(""), 2000)
       }
     } catch { /* silent */ } finally { setUnflagging(false) }
+  }
+
+  async function handleSaveContact() {
+    setSavingContact(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ poc_name: editPocName, poc_email: editPocEmail, poc_phone: editPocPhone }),
+      })
+      if (res.ok) {
+        const { lead: updated } = await res.json()
+        onUpdate(updated)
+        setEditingContact(false)
+        setFlash("Contact updated!")
+        setTimeout(() => setFlash(""), 2000)
+      }
+    } catch { /* silent */ } finally { setSavingContact(false) }
+  }
+
+  async function handleDeleteLead() {
+    if (!confirm(`Delete "${lead.company}"? This cannot be undone.`)) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" })
+      if (res.ok) { onDelete(lead.id); onClose() }
+    } catch { /* silent */ } finally { setDeleting(false) }
   }
 
   const resolvedDealValue = dealPreset === -1
@@ -881,18 +923,46 @@ function DetailPanel({
 
         {/* Contact */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div>
-            <div className="g-label" style={{ marginBottom: 5 }}>Point of Contact</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>{lead.poc_name}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="g-label">Point of Contact</div>
+            {canEditContact && !editingContact && (
+              <button className="btn-ghost" style={{ padding: "3px 9px", fontSize: 10 }}
+                onClick={() => setEditingContact(true)}>
+                Edit
+              </button>
+            )}
+            {editingContact && (
+              <div style={{ display: "flex", gap: 6 }}>
+                <button className="btn-ghost" style={{ padding: "3px 9px", fontSize: 10 }}
+                  onClick={() => { setEditingContact(false); setEditPocName(lead.poc_name); setEditPocEmail(lead.poc_email); setEditPocPhone(lead.poc_phone) }}>
+                  Cancel
+                </button>
+                <button onClick={handleSaveContact} disabled={savingContact}
+                  style={{ padding: "3px 9px", fontSize: 10, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "var(--r-sm)", color: "var(--success)", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
+                  {savingContact ? "Saving…" : "Save"}
+                </button>
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Mail size={13} color="var(--text-3)" />
-            <span style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.poc_email}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Phone size={13} color="var(--text-3)" />
-            <span style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.poc_phone}</span>
-          </div>
+          {editingContact ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input className="g-input" value={editPocName}  onChange={e => setEditPocName(e.target.value)}  placeholder="Contact name" />
+              <input className="g-input" value={editPocEmail} onChange={e => setEditPocEmail(e.target.value)} placeholder="Email address" type="email" />
+              <input className="g-input" value={editPocPhone} onChange={e => setEditPocPhone(e.target.value)} placeholder="Phone number" />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>{lead.poc_name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Mail size={13} color="var(--text-3)" />
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.poc_email}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Phone size={13} color="var(--text-3)" />
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.poc_phone}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {lead.notes && (
@@ -968,6 +1038,13 @@ function DetailPanel({
               style={{ padding: "11px 14px", color: "#FB923C", borderColor: "rgba(251,146,60,0.25)" }}
               title="Flag an issue with this lead">
               <Flag size={13} strokeWidth={1.5} />
+            </button>
+          )}
+          {canDeleteFlagged && (
+            <button onClick={handleDeleteLead} disabled={deleting}
+              style={{ padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "var(--r-md)", color: "var(--danger)", cursor: deleting ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 700, gap: 6 }}
+              title="Delete this lead">
+              <X size={13} strokeWidth={2} /> {deleting ? "…" : "Delete"}
             </button>
           )}
         </div>
@@ -1126,6 +1203,11 @@ export default function LeadsPage() {
   function handleLeadUpdate(updated: Lead) {
     setLeads(prev => prev.map(l => l.id === updated.id ? updated : l))
     setSelected(updated)
+  }
+
+  function handleLeadDelete(id: string) {
+    setLeads(prev => prev.filter(l => l.id !== id))
+    setSelected(null)
   }
 
   const kanbanStages: LeadStage[] = ["prospect", "qualified", "proposal", "negotiation", "won", "lost"]
@@ -1371,6 +1453,7 @@ export default function LeadsPage() {
             onClose={() => setSelected(null)}
             onUpdate={handleLeadUpdate}
             onCompose={setMailLead}
+            onDelete={handleLeadDelete}
           />
         )}
       </AnimatePresence>

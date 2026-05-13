@@ -198,6 +198,30 @@ export async function getUserById(id: string): Promise<User | null> {
   return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
+// Single query that fetches user + both force-logout timestamps together
+export async function getUserWithForceLogout(id: string): Promise<{
+  user:     User | null
+  globalTs: string | null
+  userTs:   string | null
+}> {
+  await ensureInit()
+  const globalKey = "force_logout_all"
+  const userKey   = `force_logout_user_${id}`
+  const rows = await db()`
+    SELECT u.*,
+      (SELECT value FROM garuda_settings WHERE key = ${globalKey}) AS global_logout,
+      (SELECT value FROM garuda_settings WHERE key = ${userKey})   AS user_logout
+    FROM garuda_users u WHERE u.id = ${id}
+  `
+  if (!rows[0]) return { user: null, globalTs: null, userTs: null }
+  const r = rows[0] as Row
+  return {
+    user:     rowToUser(r),
+    globalTs: r.global_logout ? String(r.global_logout) : null,
+    userTs:   r.user_logout   ? String(r.user_logout)   : null,
+  }
+}
+
 export async function getUserByUsername(username: string): Promise<User | null> {
   await ensureInit()
   const rows = await db()`

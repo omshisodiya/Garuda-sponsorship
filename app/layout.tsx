@@ -221,7 +221,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // Poll /api/auth/me every 60s — detects server-side force-logout by superadmin
   useEffect(() => {
     if (noLayout) return
-    const id = setInterval(async () => {
+    const id = setInterval(async () => { // 3-min interval — force-logout detected within 3 min
       try {
         const res = await fetch("/api/auth/me")
         if (res.status === 401) {
@@ -230,7 +230,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           window.location.href = "/login"
         }
       } catch { /* network blip — ignore, next tick will retry */ }
-    }, 60_000)
+    }, 180_000)
     return () => clearInterval(id)
   }, [noLayout])
 

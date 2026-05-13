@@ -33,14 +33,6 @@ async function _init(): Promise<void> {
   `
   await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS assigned_by TEXT`
   await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS assigned_by_role TEXT`
-  // Reset leads that were seeded with pre-assigned/pre-progressed status (ghost XP fix)
-  await sql`
-    UPDATE garuda_leads
-    SET status = 'not_started', stage = 'prospect',
-        assigned_to = NULL, assigned_by = NULL, assigned_by_role = NULL
-    WHERE id IN ('L053','L054','L062','L066','L067','L069','L073','L074','L077')
-      AND status = 'contacted'
-  `
   // Seed from JSON if table is empty
   const countRows = await sql`SELECT COUNT(*)::int AS cnt FROM garuda_leads`
   const count = (countRows[0]?.cnt as number) ?? 0

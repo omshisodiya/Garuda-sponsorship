@@ -53,17 +53,6 @@ async function _init(): Promise<void> {
       rejected_reason  TEXT
     )
   `
-  // Drop old UNIQUE constraint if it exists (allows re-claiming after verification)
-  await db()`
-    DO $$ BEGIN
-      IF EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'garuda_mission_claims_mission_id_user_id_key'
-      ) THEN
-        ALTER TABLE garuda_mission_claims DROP CONSTRAINT garuda_mission_claims_mission_id_user_id_key;
-      END IF;
-    END $$
-  `
   // Partial unique index: only one active claim per (mission, user) at a time
   await db()`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_active_mission_claim

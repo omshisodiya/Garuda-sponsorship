@@ -84,8 +84,9 @@ export type TierName = "superadmin" | "admin" | "team"
 export const CATEGORIES = ["FMCG", "Tech", "F&B", "Sports", "Lifestyle", "Automotive", "Finance", "EdTech", "Healthcare", "Media"] as const
 export type Category = typeof CATEGORIES[number]
 
-export type LeadStatus = "not_started" | "contacted" | "in_discussion" | "confirmed" | "rejected"
+export type LeadStatus = "not_started" | "contacted" | "followed_up" | "in_discussion" | "confirmed" | "rejected"
 export type LeadStage  = "prospect" | "qualified" | "proposal" | "negotiation" | "won" | "lost"
+export type FlagType   = "wrong_details" | "no_reply"
 
 export type Lead = {
   id: string
@@ -106,6 +107,10 @@ export type Lead = {
   created_at: string
   created_by: string
   screenshots?: Record<string, string>
+  flag_type:   FlagType | null
+  flag_note:   string
+  flagged_by:  string | null
+  flagged_at:  string
 }
 
 export const LEADS: Lead[] = []
@@ -116,7 +121,7 @@ export function getStats() {
   const active    = LEADS.filter(l => !["rejected", "confirmed"].includes(l.status))
   const secured   = confirmed.reduce((s, l) => s + l.deal_value, 0)
   const pipeline  = active.reduce((s, l) => s + (l.deal_value * l.probability / 100), 0)
-  const contacted = LEADS.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status))
+  const contacted = LEADS.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status))
   const inDiscussion = LEADS.filter(l => l.status === "in_discussion")
   const won = LEADS.filter(l => l.stage === "won")
   const qualified = LEADS.filter(l => ["qualified","proposal","negotiation","won"].includes(l.stage))

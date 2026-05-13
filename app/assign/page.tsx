@@ -335,7 +335,7 @@ export default function AssignPage() {
                     </td>
                     <td><span className="badge badge-purple" style={{ fontSize: 9 }}>{lead.category}</span></td>
                     <td>
-                      <span className={`badge ${lead.status === "confirmed" ? "badge-green" : lead.status === "in_discussion" ? "badge-gold" : lead.status === "rejected" ? "badge-red" : "badge-blue"}`} style={{ fontSize: 9 }}>
+                      <span className={`badge ${lead.status === "confirmed" ? "badge-green" : lead.status === "in_discussion" ? "badge-gold" : lead.status === "followed_up" ? "badge-orange" : lead.status === "contacted" ? "badge-purple" : lead.status === "rejected" ? "badge-red" : "badge-blue"}`} style={{ fontSize: 9 }}>
                         {lead.status.replace(/_/g, " ")}
                       </span>
                     </td>

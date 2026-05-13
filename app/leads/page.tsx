@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Search, Upload, Plus, X, Mail, Phone, ChevronRight,
   LayoutGrid, List, SlidersHorizontal, Download, Loader, Camera, Save, Check, Copy,
+  Flag, AlertTriangle, CheckCircle2,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
-  CATEGORIES, CLUB, TIERS, type Lead, type LeadStatus, type LeadStage, type Category,
+  CATEGORIES, CLUB, TIERS, type Lead, type LeadStatus, type LeadStage, type Category, type FlagType,
 } from "../lib/data"
 
 // ── DisplayUser helpers ──────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ const DEAL_OPTIONS = [
 const STATUS_COLORS: Record<LeadStatus, string> = {
   not_started:  "badge-blue",
   contacted:    "badge-purple",
+  followed_up:  "badge-orange",
   in_discussion:"badge-gold",
   confirmed:    "badge-green",
   rejected:     "badge-red",
@@ -71,7 +73,7 @@ const STAGE_COLORS: Record<LeadStage, string> = {
   lost:        "badge-red",
 }
 
-const STATUS_OPTIONS: LeadStatus[] = ["not_started","contacted","in_discussion","confirmed","rejected"]
+const STATUS_OPTIONS: LeadStatus[] = ["not_started","contacted","followed_up","in_discussion","confirmed","rejected"]
 const ALL_STATUSES: Array<LeadStatus | "all"> = ["all", ...STATUS_OPTIONS]
 
 function getUserName(users: DisplayUser[], id: string | null) {
@@ -94,7 +96,7 @@ function exportPerMember(leads: Lead[], users: DisplayUser[]) {
   const summaryRows = nonSuperadmin.map(m => {
     const myLeads   = leads.filter(l => l.assigned_to === m.id)
     const confirmed = myLeads.filter(l => l.status === "confirmed")
-    const contacted = myLeads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status))
+    const contacted = myLeads.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status))
     return {
       "Name":             m.name,
       "Role":             m.role,
@@ -550,6 +552,90 @@ function EmailComposeModal({
   )
 }
 
+// ── Flag modal ────────────────────────────────────────────────────────────────
+function FlagModal({
+  lead, onClose, onFlagged,
+}: { lead: Lead; onClose: () => void; onFlagged: (updated: Lead) => void }) {
+  const [flagType, setFlagType] = useState<FlagType>("wrong_details")
+  const [flagNote, setFlagNote] = useState("")
+  const [saving,   setSaving]   = useState(false)
+  const [err,      setErr]      = useState("")
+
+  async function submit() {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/flag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flag_type: flagType, flag_note: flagNote }),
+      })
+      if (res.ok) {
+        const { lead: updated } = await res.json()
+        onFlagged(updated)
+        onClose()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setErr((d as { error?: string }).error ?? "Failed to flag lead")
+      }
+    } catch { setErr("Network error") } finally { setSaving(false) }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}
+      onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        className="panel" style={{ width: "100%", maxWidth: 400, padding: 24 }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-1)", display: "flex", alignItems: "center", gap: 8 }}>
+              <Flag size={14} color="var(--warning)" strokeWidth={1.5} /> Flag Issue
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>{lead.company}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer" }}><X size={15} /></button>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8, fontWeight: 600 }}>Issue Type</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {([
+              { value: "wrong_details" as FlagType, label: "Wrong Contact Details", desc: "Name, email, or phone is incorrect" },
+              { value: "no_reply"      as FlagType, label: "No Reply Till Date",    desc: "Contact has not responded to outreach" },
+            ] as const).map(opt => (
+              <label key={opt.value} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: flagType === opt.value ? "rgba(251,146,60,0.08)" : "rgba(0,0,0,0.2)", border: `1px solid ${flagType === opt.value ? "rgba(251,146,60,0.3)" : "rgba(201,162,75,0.1)"}`, borderRadius: "var(--r-md)", cursor: "pointer" }}>
+                <input type="radio" name="flagType" value={opt.value} checked={flagType === opt.value} onChange={() => setFlagType(opt.value)} style={{ marginTop: 2, accentColor: "#FB923C" }} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)" }}>{opt.label}</div>
+                  <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 1 }}>{opt.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 6, fontWeight: 600 }}>Note (optional)</div>
+          <textarea className="g-input" value={flagNote} onChange={e => setFlagNote(e.target.value)}
+            placeholder="Describe the issue briefly…" style={{ minHeight: 70, resize: "vertical", width: "100%", boxSizing: "border-box" }} />
+        </div>
+
+        {err && <div style={{ fontSize: 11, color: "var(--danger)", marginBottom: 10 }}>{err}</div>}
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-ghost" onClick={onClose} style={{ flex: 1, justifyContent: "center", fontSize: 11 }} disabled={saving}>Cancel</button>
+          <button onClick={submit} disabled={saving}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 16px", background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.3)", borderRadius: "var(--r-md)", color: "#FB923C", fontSize: 11, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+            <Flag size={11} strokeWidth={1.5} /> {saving ? "Flagging…" : "Flag Lead"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ── Detail slide-over ─────────────────────────────────────────────────────────
 function DetailPanel({
   lead,
@@ -573,9 +659,11 @@ function DetailPanel({
   const [dealCustom,     setDealCustom]     = useState<string>(
     DEAL_OPTIONS.find(o => o.value === lead.deal_value) ? "" : String(lead.deal_value)
   )
-  const [saving,         setSaving]         = useState(false)
-  const [flash,          setFlash]          = useState("")
+  const [saving,          setSaving]          = useState(false)
+  const [flash,           setFlash]           = useState("")
   const [fullScreenshots, setFullScreenshots] = useState<Record<string, string>>(lead.screenshots ?? {})
+  const [flagModalOpen,   setFlagModalOpen]   = useState(false)
+  const [unflagging,      setUnflagging]      = useState(false)
   const screenshotRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -590,6 +678,28 @@ function DetailPanel({
     ? currentUser.role === "superadmin" || currentUser.role === "admin" ||
       (currentUser.role === "team" && lead.assigned_to === currentUser.id)
     : false
+
+  // superadmin can flag any lead; admin/team can only flag their own
+  const canFlag = currentUser
+    ? currentUser.role === "superadmin" || lead.assigned_to === currentUser.id
+    : false
+  // superadmin can unflag any; others can only remove their own flag
+  const canUnflag = currentUser
+    ? currentUser.role === "superadmin" || lead.flagged_by === currentUser.id
+    : false
+
+  async function handleUnflag() {
+    setUnflagging(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/flag`, { method: "DELETE" })
+      if (res.ok) {
+        const { lead: updated } = await res.json()
+        onUpdate(updated)
+        setFlash("Flag removed")
+        setTimeout(() => setFlash(""), 2000)
+      }
+    } catch { /* silent */ } finally { setUnflagging(false) }
+  }
 
   const resolvedDealValue = dealPreset === -1
     ? (parseInt(dealCustom) || 0)
@@ -675,12 +785,40 @@ function DetailPanel({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-1)" }}>{lead.company}</div>
-            <span className={`badge ${STATUS_COLORS[lead.status]}`} style={{ fontSize: 9, marginTop: 6, display: "inline-flex" }}>
-              {lead.status.replace(/_/g, " ")}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              <span className={`badge ${STATUS_COLORS[lead.status]}`} style={{ fontSize: 9 }}>
+                {lead.status.replace(/_/g, " ")}
+              </span>
+              {lead.flag_type && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px", background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.3)", borderRadius: 20, fontSize: 9, fontWeight: 700, color: "#FB923C" }}>
+                  <Flag size={8} strokeWidth={2} />
+                  {lead.flag_type === "wrong_details" ? "Wrong Details" : "No Reply"}
+                </span>
+              )}
+            </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer" }}><X size={18} /></button>
         </div>
+
+        {/* Flag banner */}
+        {lead.flag_type && (
+          <div style={{ padding: "10px 14px", background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.2)", borderRadius: "var(--r-md)", display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <AlertTriangle size={14} color="#FB923C" strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#FB923C" }}>
+                {lead.flag_type === "wrong_details" ? "Wrong contact details reported" : "No reply till date"}
+              </div>
+              {lead.flag_note && <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 3 }}>{lead.flag_note}</div>}
+              <div style={{ fontSize: 9, color: "var(--text-3)", marginTop: 2 }}>Flagged {lead.flagged_at}</div>
+            </div>
+            {canUnflag && (
+              <button onClick={handleUnflag} disabled={unflagging}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--text-3)", display: "flex" }}>
+                {unflagging ? <Loader size={12} style={{ animation: "spin 1s linear infinite" }} /> : <CheckCircle2 size={13} color="var(--success)" strokeWidth={1.5} />}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Editable Status */}
         {canEdit && (
@@ -812,20 +950,38 @@ function DetailPanel({
         )}
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: "auto", flexWrap: "wrap" }}>
           {canEdit && (
             <button className="btn-gold" onClick={handleSave} disabled={saving}
-              style={{ flex: 1, justifyContent: "center", fontSize: 11 }}>
+              style={{ flex: 1, justifyContent: "center", fontSize: 11, minWidth: 110 }}>
               <Save size={12} /> {saving ? "Saving…" : "Save Changes"}
             </button>
           )}
           <button className="btn-ghost"
             onClick={() => onCompose(lead)}
-            style={{ flex: canEdit ? 0 : 1, justifyContent: "center", fontSize: 11, padding: "11px 14px" }}>
+            style={{ justifyContent: "center", fontSize: 11, padding: "11px 14px" }}>
             <Mail size={12} />
           </button>
           <button className="btn-ghost" style={{ padding: "11px 14px" }}><Phone size={13} /></button>
+          {canFlag && !lead.flag_type && (
+            <button className="btn-ghost" onClick={() => setFlagModalOpen(true)}
+              style={{ padding: "11px 14px", color: "#FB923C", borderColor: "rgba(251,146,60,0.25)" }}
+              title="Flag an issue with this lead">
+              <Flag size={13} strokeWidth={1.5} />
+            </button>
+          )}
         </div>
+
+        {/* Flag modal */}
+        <AnimatePresence>
+          {flagModalOpen && (
+            <FlagModal
+              lead={lead}
+              onClose={() => setFlagModalOpen(false)}
+              onFlagged={updated => { onUpdate(updated); setFlagModalOpen(false) }}
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     </>
   )
@@ -844,6 +1000,7 @@ export default function LeadsPage() {
   const [viewMode,       setViewMode]       = useState<"table" | "kanban">("table")
   const [myLeadsOnly,    setMyLeadsOnly]    = useState(false)
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
+  const [showFlagged,    setShowFlagged]    = useState(false)
   const [showImport,     setShowImport]     = useState(false)
   const [showAddForm,    setShowAddForm]    = useState(false)
   const [importFlash,    setImportFlash]    = useState("")
@@ -883,9 +1040,10 @@ export default function LeadsPage() {
         : assigneeFilter === "unassigned"
           ? l.assigned_to === null
           : l.assigned_to === assigneeFilter
-      return matchSearch && matchStatus && matchCat && matchMine && matchAssignee
+      const matchFlagged  = !showFlagged || l.flag_type !== null
+      return matchSearch && matchStatus && matchCat && matchMine && matchAssignee && matchFlagged
     })
-  }, [leads, search, statusFilter, categoryFilter, myLeadsOnly, currentUser, assigneeFilter])
+  }, [leads, search, statusFilter, categoryFilter, myLeadsOnly, currentUser, assigneeFilter, showFlagged])
 
   function resolvedDealValue() {
     if (form.deal_preset === -1) return parseInt(form.deal_custom) || 0
@@ -1013,11 +1171,20 @@ export default function LeadsPage() {
 
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
           {ALL_STATUSES.map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              style={{ padding: "6px 12px", borderRadius: "var(--r-sm)", border: `1px solid ${statusFilter === s ? "rgba(201,162,75,0.4)" : "rgba(201,162,75,0.1)"}`, background: statusFilter === s ? "rgba(201,162,75,0.1)" : "transparent", color: statusFilter === s ? "#C9A24B" : "var(--text-3)", fontSize: 10, fontWeight: statusFilter === s ? 700 : 400, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize", transition: "all 0.14s" }}>
+            <button key={s} onClick={() => { setStatusFilter(s); setShowFlagged(false) }}
+              style={{ padding: "6px 12px", borderRadius: "var(--r-sm)", border: `1px solid ${statusFilter === s && !showFlagged ? "rgba(201,162,75,0.4)" : "rgba(201,162,75,0.1)"}`, background: statusFilter === s && !showFlagged ? "rgba(201,162,75,0.1)" : "transparent", color: statusFilter === s && !showFlagged ? "#C9A24B" : "var(--text-3)", fontSize: 10, fontWeight: statusFilter === s && !showFlagged ? 700 : 400, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize", transition: "all 0.14s" }}>
               {s === "all" ? "All" : s.replace("_", " ")}
             </button>
           ))}
+          <button onClick={() => { setShowFlagged(v => !v); setStatusFilter("all") }}
+            style={{ padding: "6px 12px", borderRadius: "var(--r-sm)", border: `1px solid ${showFlagged ? "rgba(251,146,60,0.5)" : "rgba(251,146,60,0.15)"}`, background: showFlagged ? "rgba(251,146,60,0.12)" : "transparent", color: showFlagged ? "#FB923C" : "var(--text-3)", fontSize: 10, fontWeight: showFlagged ? 700 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all 0.14s", display: "flex", alignItems: "center", gap: 5 }}>
+            <Flag size={9} strokeWidth={showFlagged ? 2.5 : 1.5} /> Flagged
+            {leads.filter(l => l.flag_type !== null).length > 0 && (
+              <span style={{ background: "#FB923C", color: "#000", borderRadius: 20, fontSize: 8, fontWeight: 800, padding: "1px 5px", lineHeight: 1.4 }}>
+                {leads.filter(l => l.flag_type !== null).length}
+              </span>
+            )}
+          </button>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1085,7 +1252,16 @@ export default function LeadsPage() {
                 {filtered.map((lead, i) => (
                   <motion.tr key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i * 0.018, 0.3) }}
                     style={{ cursor: "pointer" }} onClick={() => setSelected(lead)}>
-                    <td style={{ fontWeight: 700, color: "var(--text-1)", fontSize: 13 }}>{lead.company}</td>
+                    <td style={{ fontWeight: 700, color: "var(--text-1)", fontSize: 13 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {lead.company}
+                        {lead.flag_type && (
+                          <span title={lead.flag_type === "wrong_details" ? "Wrong details flagged" : "No reply flagged"}>
+                            <Flag size={10} color="#FB923C" strokeWidth={2} />
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td style={{ fontSize: 11, color: "var(--text-2)" }}>
                       <div>{lead.poc_name}</div>
                       <div style={{ color: "var(--text-3)", marginTop: 1 }}>{lead.poc_email}</div>
@@ -1161,7 +1337,10 @@ export default function LeadsPage() {
                   {stageLeads.map(lead => (
                     <motion.div key={lead.id} whileHover={{ y: -2 }} onClick={() => setSelected(lead)} className="panel"
                       style={{ padding: "12px 14px", cursor: "pointer", borderLeft: `3px solid ${stage === "won" ? "var(--success)" : stage === "lost" ? "var(--danger)" : stage === "negotiation" ? "var(--warning)" : "var(--brand-edge)"}` }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>{lead.company}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)", marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                        {lead.company}
+                        {lead.flag_type && <Flag size={9} color="#FB923C" strokeWidth={2} />}
+                      </div>
                       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 8 }}>{lead.poc_name} · {lead.category}</div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: "#C9A24B" }}>

@@ -21,7 +21,7 @@ export default function MePage() {
   const myLeads = LEADS.filter(l => l.assigned_to === member.id)
   const confirmed = myLeads.filter(l => l.status === "confirmed")
   const inDiscussion = myLeads.filter(l => l.status === "in_discussion")
-  const contacted = myLeads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status))
+  const contacted = myLeads.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status))
   const secured = confirmed.reduce((s, l) => s + l.deal_value, 0)
   const pipeline = myLeads.filter(l => !["rejected"].includes(l.status)).reduce((s, l) => s + l.deal_value * l.probability / 100, 0)
   const xp = secured / 100 + contacted.length * 10 + confirmed.length * 50
@@ -160,7 +160,7 @@ export default function MePage() {
                 {myLeads.slice(0, 8).map(lead => (
                   <tr key={lead.id}>
                     <td style={{ fontWeight: 600, color: "var(--text-1)" }}>{lead.company}</td>
-                    <td><span className={`badge ${lead.status === "confirmed" ? "badge-green" : lead.status === "in_discussion" ? "badge-gold" : "badge-blue"}`} style={{ fontSize: 9 }}>{lead.status.replace("_"," ")}</span></td>
+                    <td><span className={`badge ${lead.status === "confirmed" ? "badge-green" : lead.status === "in_discussion" ? "badge-gold" : lead.status === "followed_up" ? "badge-orange" : lead.status === "contacted" ? "badge-purple" : "badge-blue"}`} style={{ fontSize: 9 }}>{lead.status.replace(/_/g," ")}</span></td>
                     <td style={{ fontWeight: 700, color: "#C9A24B", fontSize: 12 }}>₹{lead.deal_value.toLocaleString("en-IN")}</td>
                     <td style={{ fontSize: 12, color: lead.probability >= 70 ? "var(--success)" : "var(--warning)" }}>{lead.probability}%</td>
                   </tr>

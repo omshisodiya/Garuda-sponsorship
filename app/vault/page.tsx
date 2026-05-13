@@ -166,7 +166,7 @@ export default function VaultPage() {
                   <td style={{ fontWeight: 700, color: "var(--text-1)", fontSize: 13 }}>{lead.company}</td>
                   <td><span className="badge badge-purple" style={{ fontSize: 9 }}>{lead.category}</span></td>
                   <td>
-                    <span className={`badge ${lead.status === "confirmed" ? "badge-green" : lead.status === "in_discussion" ? "badge-gold" : lead.status === "contacted" ? "badge-blue" : "badge-orange"}`} style={{ fontSize: 9 }}>
+                    <span className={`badge ${lead.status === "confirmed" ? "badge-green" : lead.status === "in_discussion" ? "badge-gold" : lead.status === "followed_up" ? "badge-orange" : lead.status === "contacted" ? "badge-purple" : "badge-blue"}`} style={{ fontSize: 9 }}>
                       {lead.status.replace("_"," ")}
                     </span>
                   </td>

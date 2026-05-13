@@ -306,7 +306,7 @@ function computeStats(leads: Lead[]) {
   const active        = leads.filter(l => !["rejected", "confirmed"].includes(l.status))
   const secured       = confirmed.reduce((s, l) => s + l.deal_value, 0)
   const pipeline      = active.reduce((s, l) => s + (l.deal_value * l.probability / 100), 0)
-  const contacted     = leads.filter(l => ["contacted", "in_discussion", "confirmed"].includes(l.status))
+  const contacted     = leads.filter(l => ["contacted", "followed_up", "in_discussion", "confirmed"].includes(l.status))
   const inDiscussion  = leads.filter(l => l.status === "in_discussion")
   const won           = leads.filter(l => l.stage === "won")
   const qualified     = leads.filter(l => ["qualified", "proposal", "negotiation", "won"].includes(l.stage))
@@ -345,6 +345,7 @@ function relativeTime(ts: string): string {
 const STATUS_BADGE: Record<string, string> = {
   not_started:   "badge-blue",
   contacted:     "badge-purple",
+  followed_up:   "badge-orange",
   in_discussion: "badge-gold",
   confirmed:     "badge-green",
   rejected:      "badge-red",
@@ -509,7 +510,7 @@ function exportDashboardReport(
 
   // ── Status Breakdown ──
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
-    ["not_started","contacted","in_discussion","confirmed","rejected"].map(s => ({
+    ["not_started","contacted","followed_up","in_discussion","confirmed","rejected"].map(s => ({
       "Status":       s.replace(/_/g, " "),
       "Count":        leads.filter(l => l.status === s).length,
       "Total Value (₹)": leads.filter(l => l.status === s).reduce((sum, l) => sum + l.deal_value, 0),
@@ -540,7 +541,7 @@ function exportDashboardReport(
         "Member":               u.name,
         "Role":                 u.role,
         "Assigned Leads":       ml.length,
-        "Contacted":            ml.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status)).length,
+        "Contacted":            ml.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status)).length,
         "In Discussion":        ml.filter(l => l.status === "in_discussion").length,
         "Confirmed":            con.length,
         "Revenue Secured (₹)":  con.reduce((s, l) => s + l.deal_value, 0),
@@ -717,7 +718,7 @@ export default function SuperAdminDashboard() {
 
     // Ready to advance (contacted, ≥50% probability)
     leads
-      .filter(l => l.status === "contacted" && l.probability >= 50)
+      .filter(l => ["contacted","followed_up"].includes(l.status) && l.probability >= 50)
       .slice(0, 1)
       .forEach(l => out.push({
         id: `adv-${l.id}`, type: "action",
@@ -888,7 +889,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.contacted > 0,
       accentColor: "#A78BFA",
       icon: <PhoneCall size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Contacted Leads", leads: leads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status)) }),
+      onDrill: () => setDrill({ label: "Contacted Leads", leads: leads.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status)) }),
     },
     {
       label: "In Discussion",

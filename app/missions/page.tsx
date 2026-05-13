@@ -170,6 +170,7 @@ function xpForLead(lead: Lead): number {
     return 100
   }
   if (lead.status === "in_discussion") return 75
+  if (lead.status === "followed_up")   return 50
   if (lead.status === "contacted")     return 30
   return 0
 }
@@ -493,6 +494,7 @@ export default function MissionsPage() {
         const lXp = myLeads.reduce((s, l) => {
           if (l.status === "confirmed") return s + (l.deal_value >= 150000 ? 400 : l.deal_value >= 95000 ? 300 : l.deal_value > 0 ? 200 : 100)
           if (l.status === "in_discussion") return s + 75
+          if (l.status === "followed_up")   return s + 50
           if (l.status === "contacted") return s + 30
           return s
         }, 0)

@@ -1,5 +1,5 @@
 import { db, type Row } from "./db"
-import { CLUB, type Lead } from "../data"
+import { CLUB, type Lead, type FlagType } from "../data"
 import seedData from "./seedLeads.json"
 
 // ── Table init ────────────────────────────────────────────────────────────────
@@ -33,6 +33,10 @@ async function _init(): Promise<void> {
   `
   await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS assigned_by TEXT`
   await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS assigned_by_role TEXT`
+  await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS flag_type TEXT DEFAULT NULL`
+  await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS flag_note TEXT NOT NULL DEFAULT ''`
+  await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS flagged_by TEXT DEFAULT NULL`
+  await sql`ALTER TABLE garuda_leads ADD COLUMN IF NOT EXISTS flagged_at TEXT NOT NULL DEFAULT ''`
   // Seed from JSON if table is empty
   const countRows = await sql`SELECT COUNT(*)::int AS cnt FROM garuda_leads`
   const count = (countRows[0]?.cnt as number) ?? 0
@@ -79,6 +83,10 @@ function rowToLead(row: Row): Lead {
     assigned_by:       row.assigned_by      ? String(row.assigned_by)      : null,
     assigned_by_role:  row.assigned_by_role ? String(row.assigned_by_role) : null,
     screenshots:   (row.screenshots as Record<string, string>) ?? {},
+    flag_type:     (row.flag_type as FlagType | null) ?? null,
+    flag_note:     String(row.flag_note ?? ""),
+    flagged_by:    row.flagged_by  ? String(row.flagged_by)  : null,
+    flagged_at:    String(row.flagged_at ?? ""),
   }
 }
 
@@ -93,7 +101,8 @@ export async function getAllLeads(): Promise<Lead[]> {
   const rows = await db()`
     SELECT id, company, poc_name, poc_email, poc_phone, category, status, stage,
            assigned_to, assigned_by, assigned_by_role, deal_value, probability,
-           notes, last_activity, created_at, created_by
+           notes, last_activity, created_at, created_by,
+           flag_type, flag_note, flagged_by, flagged_at
     FROM garuda_leads ORDER BY created_at DESC
   `
   return rows.map(r => rowToLead(r as Row))
@@ -110,7 +119,8 @@ export async function getLeadsByAssignee(userId: string): Promise<Lead[]> {
   const rows = await db()`
     SELECT id, company, poc_name, poc_email, poc_phone, category, status, stage,
            assigned_to, assigned_by, assigned_by_role, deal_value, probability,
-           notes, last_activity, created_at, created_by
+           notes, last_activity, created_at, created_by,
+           flag_type, flag_note, flagged_by, flagged_at
     FROM garuda_leads WHERE assigned_to = ${userId} ORDER BY created_at DESC
   `
   return rows.map(r => rowToLead(r as Row))
@@ -170,10 +180,41 @@ export async function updateLead(
       probability   = ${m.probability},
       notes         = ${m.notes},
       last_activity = ${m.last_activity},
-      screenshots   = ${JSON.stringify(m.screenshots)}
+      screenshots   = ${JSON.stringify(m.screenshots)},
+      flag_type     = ${m.flag_type ?? null},
+      flag_note     = ${m.flag_note ?? ""},
+      flagged_by    = ${m.flagged_by ?? null},
+      flagged_at    = ${m.flagged_at ?? ""}
     WHERE id = ${id}
   `
   return m as Lead
+}
+
+export async function flagLead(
+  id: string,
+  flagType: FlagType,
+  flagNote: string,
+  flaggedBy: string
+): Promise<Lead | null> {
+  await ensureInit()
+  const flaggedAt = new Date().toISOString().split("T")[0]
+  await db()`
+    UPDATE garuda_leads
+    SET flag_type = ${flagType}, flag_note = ${flagNote},
+        flagged_by = ${flaggedBy}, flagged_at = ${flaggedAt}
+    WHERE id = ${id}
+  `
+  return getLeadById(id)
+}
+
+export async function unflagLead(id: string): Promise<Lead | null> {
+  await ensureInit()
+  await db()`
+    UPDATE garuda_leads
+    SET flag_type = NULL, flag_note = '', flagged_by = NULL, flagged_at = ''
+    WHERE id = ${id}
+  `
+  return getLeadById(id)
 }
 
 export async function deleteLead(id: string): Promise<boolean> {
@@ -191,7 +232,7 @@ export function computeStats(leads: Lead[]) {
   const active       = leads.filter(l => !["rejected","confirmed"].includes(l.status))
   const secured      = confirmed.reduce((s, l) => s + l.deal_value, 0)
   const pipeline     = active.reduce((s, l) => s + (l.deal_value * l.probability / 100), 0)
-  const contacted    = leads.filter(l => ["contacted","in_discussion","confirmed"].includes(l.status))
+  const contacted    = leads.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status))
   const inDiscussion = leads.filter(l => l.status === "in_discussion")
   const won          = leads.filter(l => l.stage === "won")
   const qualified    = leads.filter(l => ["qualified","proposal","negotiation","won"].includes(l.stage))

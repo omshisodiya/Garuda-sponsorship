@@ -290,7 +290,7 @@
   },
   {
     "id": "L018",
-    "company": "SIMPL",
+    "company": "Zomunk",
     "poc_name": "Shankar mohan",
     "poc_email": "prateek@zomunk.com",
     "poc_phone": "",
@@ -903,7 +903,7 @@
   {
     "id": "L054",
     "company": "THE WHOLE TRUTH",
-    "poc_name": "Neha mahimkar",
+    "poc_name": "Chetan Sharma",
     "poc_email": "chetan.sharma@cleartrip.com",
     "poc_phone": "91677 06946",
     "category": "FMCG",
@@ -1345,7 +1345,7 @@
   {
     "id": "L080",
     "company": "AMBRANE",
-    "poc_name": "Manish bhuttan",
+    "poc_name": "Manish Buttan",
     "poc_email": "manish.buttan@ambraneindia.com",
     "poc_phone": "",
     "category": "FMCG",
@@ -5187,7 +5187,7 @@
   {
     "id": "L306",
     "company": "Cream Bell",
-    "poc_name": "SoodAkhil",
+    "poc_name": "Satish Pandita",
     "poc_email": "satish.pandita@creambell.com",
     "poc_phone": "9811432353",
     "category": "FMCG",
@@ -6104,8 +6104,8 @@
   },
   {
     "id": "L360",
-    "company": "EY",
-    "poc_name": "Rajdeep Singh",
+    "company": "Virtusa",
+    "poc_name": "Bharath Velpula",
     "poc_email": "bharathvelpula@virtusa.com",
     "poc_phone": "2368674732.28888",
     "category": "FMCG",
@@ -6122,7 +6122,7 @@
   {
     "id": "L361",
     "company": "ZERODHA",
-    "poc_name": "Sagar Gudekote",
+    "poc_name": "Rajdeep Singh Saini",
     "poc_email": "rajdeepsinghsaini@gmail.com",
     "poc_phone": "2157870978.07221",
     "category": "Finance",
@@ -6139,7 +6139,7 @@
   {
     "id": "L362",
     "company": "LENSKART",
-    "poc_name": "Sasha Chhetri",
+    "poc_name": "K Garg",
     "poc_email": "kgargkg95@gmail.com",
     "poc_phone": "1736263469.63888",
     "category": "FMCG",
@@ -6156,7 +6156,7 @@
   {
     "id": "L363",
     "company": "Littlebox india",
-    "poc_name": "Ratul Das",
+    "poc_name": "Shirish",
     "poc_email": "shirish24@gmail.com",
     "poc_phone": "1314655961.20554",
     "category": "FMCG",
@@ -6173,7 +6173,7 @@
   {
     "id": "L364",
     "company": "Coursera",
-    "poc_name": "Anshul Sehgal",
+    "poc_name": "Prabhu Shetty",
     "poc_email": "prabhu.shetty@bonkerscorner.com",
     "poc_phone": "682244698.555542",
     "category": "EdTech",
@@ -6564,7 +6564,7 @@
   {
     "id": "L387",
     "company": "Virgio",
-    "poc_name": "Rohit Popat",
+    "poc_name": "Rajat",
     "poc_email": "rajat.p@virgio.com",
     "poc_phone": "70036 88845",
     "category": "FMCG",
@@ -7397,7 +7397,7 @@
   {
     "id": "L436",
     "company": "level supermind",
-    "poc_name": "Harshada Juikar",
+    "poc_name": "Achint",
     "poc_email": "achint@level.game",
     "poc_phone": "",
     "category": "FMCG",
@@ -9658,7 +9658,7 @@
   {
     "id": "L569",
     "company": "Ericsson",
-    "poc_name": "Swaty Swanhey",
+    "poc_name": "Swati Sawhney",
     "poc_email": "swati.sawhney@ericsson.com",
     "poc_phone": "",
     "category": "FMCG",
@@ -10049,7 +10049,7 @@
   {
     "id": "L592",
     "company": "jaipur kurti",
-    "poc_name": "anuj mundhra",
+    "poc_name": "Nirpat Singh",
     "poc_email": "nirpat.singh@jaipurkurti.com",
     "poc_phone": "",
     "category": "FMCG",
@@ -11578,8 +11578,8 @@
   },
   {
     "id": "L682",
-    "company": "Trackier",
-    "poc_name": "Nishit Verma",
+    "company": "Frappe",
+    "poc_name": "Palkan",
     "poc_email": "palkan@frappe.io",
     "poc_phone": "",
     "category": "FMCG",
@@ -12718,7 +12718,7 @@
   {
     "id": "L749",
     "company": "ALPINO FOODS",
-    "poc_name": "Hiten sheshta",
+    "poc_name": "Hiren Sheth",
     "poc_email": "hiren@alpinohealthfoods.com",
     "poc_phone": "----------------------------------",
     "category": "F&B",

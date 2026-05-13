@@ -597,7 +597,7 @@ export default function SuperAdminDashboard() {
   const [sessions, setSessions] = useState<SessionEntry[]>([])
   const [forceLogoutingAll,  setForceLogoutingAll]  = useState(false)
   const [forceLogoutingUser, setForceLogoutingUser] = useState<string | null>(null)
-  const [forceLogoutResult,  setForceLogoutResult]  = useState<{ names: string[]; ts: string } | null>(null)
+  const [forceLoggedOutIds,  setForceLoggedOutIds]  = useState<Set<string>>(new Set())
 
   type NotifHistory = {
     id: number; title: string; body: string; url?: string
@@ -732,11 +732,10 @@ export default function SuperAdminDashboard() {
   async function handleForceLogoutAll() {
     if (!confirm("Force-logout ALL active sessions across every device?")) return
     setForceLogoutingAll(true)
-    const activeSessions = sessions.filter(s => !s.logoutAt)
-    const names = [...new Set(activeSessions.map(s => s.userName))]
     try {
       await fetch("/api/auth/force-logout-all", { method: "POST" })
-      setForceLogoutResult({ names: names.length ? names : ["No active sessions"], ts: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })
+      const activeIds = new Set(sessions.filter(s => !s.logoutAt).map(s => s.userId))
+      setForceLoggedOutIds(prev => new Set([...prev, ...activeIds]))
     } finally {
       setForceLogoutingAll(false)
     }
@@ -751,7 +750,7 @@ export default function SuperAdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, userName }),
       })
-      setForceLogoutResult({ names: [userName], ts: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })
+      setForceLoggedOutIds(prev => new Set([...prev, userId]))
     } finally {
       setForceLogoutingUser(null)
     }
@@ -2019,29 +2018,6 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        {/* Force-logout result banner */}
-        <AnimatePresence>
-          {forceLogoutResult && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-              style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "var(--r-md)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", flexShrink: 0 }} />
-                <div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4ADE80" }}>Force logout sent</span>
-                  <span style={{ fontSize: 11, color: "var(--text-2)", marginLeft: 8 }}>at {forceLogoutResult.ts}</span>
-                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>
-                    Affected: <span style={{ color: "var(--text-1)", fontWeight: 600 }}>{forceLogoutResult.names.join(", ")}</span>
-                    <span style={{ marginLeft: 6, color: "var(--text-3)" }}>· Sessions will terminate within 60 seconds</span>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setForceLogoutResult(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {sessions.length === 0 ? (
           <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-3)", fontSize: 12 }}>
             No session history yet.
@@ -2062,7 +2038,8 @@ export default function SuperAdminDashboard() {
               </thead>
               <tbody>
                 {sessions.map((s, i) => {
-                  const isActive = !s.logoutAt
+                  const isActive      = !s.logoutAt
+                  const forcedOut     = isActive && forceLoggedOutIds.has(s.userId)
                   return (
                     <tr key={i}>
                       <td style={{ fontWeight: 700, color: "var(--text-1)" }}>{s.userName}</td>
@@ -2081,10 +2058,12 @@ export default function SuperAdminDashboard() {
                       <td>
                         {s.logoutAt
                           ? <span className="badge badge-green" style={{ fontSize: 9 }}>Logged out</span>
-                          : <span className="badge badge-orange" style={{ fontSize: 9 }}>Active</span>}
+                          : forcedOut
+                            ? <span className="badge badge-red" style={{ fontSize: 9 }}>Force logged out</span>
+                            : <span className="badge badge-orange" style={{ fontSize: 9 }}>Active</span>}
                       </td>
                       <td>
-                        {isActive && (
+                        {isActive && !forcedOut && (
                           <motion.button
                             whileTap={{ scale: 0.95 }}
                             onClick={() => handleForceLogoutUser(s.userId, s.userName)}

@@ -1078,6 +1078,8 @@ export default function LeadsPage() {
   const [myLeadsOnly,    setMyLeadsOnly]    = useState(false)
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [showFlagged,    setShowFlagged]    = useState(false)
+  const [selectedIds,    setSelectedIds]    = useState<Set<string>>(new Set())
+  const [bulkDeleting,   setBulkDeleting]   = useState(false)
   const [showImport,     setShowImport]     = useState(false)
   const [showAddForm,    setShowAddForm]    = useState(false)
   const [importFlash,    setImportFlash]    = useState("")
@@ -1210,6 +1212,35 @@ export default function LeadsPage() {
     setSelected(null)
   }
 
+  const bulkSelectMode = showFlagged && currentUser?.role === "superadmin"
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    const eligible = filtered.filter(l => l.flag_type !== null).map(l => l.id)
+    const allSelected = eligible.every(id => selectedIds.has(id))
+    setSelectedIds(allSelected ? new Set() : new Set(eligible))
+  }
+
+  async function handleBulkDelete() {
+    const count = selectedIds.size
+    if (!confirm(`Permanently delete ${count} flagged lead${count > 1 ? "s" : ""}? This cannot be undone.`)) return
+    setBulkDeleting(true)
+    try {
+      await Promise.all([...selectedIds].map(id =>
+        fetch(`/api/leads/${id}`, { method: "DELETE" }).catch(() => null)
+      ))
+      setLeads(prev => prev.filter(l => !selectedIds.has(l.id)))
+      setSelectedIds(new Set())
+    } catch { /* silent */ } finally { setBulkDeleting(false) }
+  }
+
   const kanbanStages: LeadStage[] = ["prospect", "qualified", "proposal", "negotiation", "won", "lost"]
 
   if (loading) {
@@ -1312,6 +1343,27 @@ export default function LeadsPage() {
         </div>
       </motion.div>
 
+      {/* Bulk action bar — superadmin + Flagged view only */}
+      <AnimatePresence>
+        {bulkSelectMode && selectedIds.size > 0 && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            style={{ marginBottom: 10, padding: "10px 16px", background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.3)", borderRadius: "var(--r-md)", display: "flex", alignItems: "center", gap: 12 }}>
+            <Flag size={13} color="#FB923C" strokeWidth={2} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#FB923C", flex: 1 }}>
+              {selectedIds.size} lead{selectedIds.size > 1 ? "s" : ""} selected
+            </span>
+            <button onClick={() => setSelectedIds(new Set())}
+              style={{ background: "none", border: "none", fontSize: 11, color: "var(--text-3)", cursor: "pointer", fontFamily: "inherit" }}>
+              Clear
+            </button>
+            <button onClick={handleBulkDelete} disabled={bulkDeleting}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "var(--r-md)", color: "var(--danger)", fontSize: 11, fontWeight: 700, cursor: bulkDeleting ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+              <X size={11} strokeWidth={2.5} /> {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size} Lead${selectedIds.size > 1 ? "s" : ""}`}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Table view */}
       {viewMode === "table" && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="panel" style={{ padding: 0, overflow: "hidden" }}>
@@ -1319,6 +1371,14 @@ export default function LeadsPage() {
             <table className="g-table" style={{ minWidth: 900 }}>
               <thead>
                 <tr>
+                  {bulkSelectMode && (
+                    <th style={{ width: 36, paddingLeft: 14 }}>
+                      <input type="checkbox"
+                        checked={filtered.filter(l => l.flag_type !== null).length > 0 && filtered.filter(l => l.flag_type !== null).every(l => selectedIds.has(l.id))}
+                        onChange={toggleSelectAll}
+                        style={{ accentColor: "#FB923C", cursor: "pointer" }} />
+                    </th>
+                  )}
                   <th>Company</th>
                   <th>Contact</th>
                   <th>Category</th>
@@ -1333,7 +1393,16 @@ export default function LeadsPage() {
               <tbody>
                 {filtered.map((lead, i) => (
                   <motion.tr key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i * 0.018, 0.3) }}
-                    style={{ cursor: "pointer" }} onClick={() => setSelected(lead)}>
+                    style={{ cursor: "pointer", background: bulkSelectMode && selectedIds.has(lead.id) ? "rgba(251,146,60,0.05)" : undefined }}
+                    onClick={() => setSelected(lead)}>
+                    {bulkSelectMode && (
+                      <td style={{ paddingLeft: 14 }} onClick={e => { e.stopPropagation(); if (lead.flag_type) toggleSelect(lead.id) }}>
+                        {lead.flag_type && (
+                          <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleSelect(lead.id)}
+                            style={{ accentColor: "#FB923C", cursor: "pointer" }} onClick={e => e.stopPropagation()} />
+                        )}
+                      </td>
+                    )}
                     <td style={{ fontWeight: 700, color: "var(--text-1)", fontSize: 13 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         {lead.company}

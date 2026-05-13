@@ -599,6 +599,9 @@ export default function SuperAdminDashboard() {
   const [forceLogoutingAll,  setForceLogoutingAll]  = useState(false)
   const [forceLogoutingUser, setForceLogoutingUser] = useState<string | null>(null)
   const [forceLoggedOutIds,  setForceLoggedOutIds]  = useState<Set<string>>(new Set())
+  const [siteDown,           setSiteDown]           = useState(false)
+  const [shutdownMsg,        setShutdownMsg]        = useState("")
+  const [shuttingDown,       setShuttingDown]       = useState(false)
 
   type NotifHistory = {
     id: number; title: string; body: string; url?: string
@@ -730,6 +733,18 @@ export default function SuperAdminDashboard() {
     return out.slice(0, 3)
   }, [leads])
 
+  async function handleToggleShutdown(enabled: boolean) {
+    setShuttingDown(true)
+    try {
+      await fetch("/api/system/shutdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled, message: shutdownMsg }),
+      })
+      setSiteDown(enabled)
+    } finally { setShuttingDown(false) }
+  }
+
   async function handleForceLogoutAll() {
     if (!confirm("Force-logout ALL active sessions across every device?")) return
     setForceLogoutingAll(true)
@@ -780,6 +795,10 @@ export default function SuperAdminDashboard() {
   }
 
   useEffect(() => {
+    fetch("/api/system/shutdown").then(r => r.ok ? r.json() : null).then(d => {
+      if (d) { setSiteDown(d.enabled); setShutdownMsg(d.message ?? "") }
+    }).catch(() => {})
+
     Promise.all([
       fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
@@ -1987,6 +2006,74 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
         )}
+      </motion.div>
+
+      {/* ── SITE SHUTDOWN ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.80, duration: 0.5 }}
+        className="panel"
+        style={{ marginTop: 20, border: siteDown ? "1px solid rgba(248,113,113,0.35)" : undefined, background: siteDown ? "rgba(248,113,113,0.04)" : undefined }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <div className="g-label" style={{ marginBottom: 4 }}>Superadmin Only</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: siteDown ? "var(--danger)" : "var(--text-1)", marginBottom: 4 }}>
+              Site Shutdown {siteDown && <span style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", marginLeft: 8 }}>— ACTIVE</span>}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-3)", maxWidth: 500, lineHeight: 1.6 }}>
+              When enabled, all admins and team members see a maintenance page. You (superadmin) are unaffected.
+            </div>
+          </div>
+
+          {/* Toggle */}
+          <button
+            onClick={() => handleToggleShutdown(!siteDown)}
+            disabled={shuttingDown}
+            style={{
+              flexShrink: 0, display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 20px", borderRadius: "var(--r-md)", fontFamily: "inherit",
+              fontSize: 12, fontWeight: 700, cursor: shuttingDown ? "not-allowed" : "pointer",
+              background: siteDown ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)",
+              border: siteDown ? "1px solid rgba(74,222,128,0.3)" : "1px solid rgba(248,113,113,0.3)",
+              color: siteDown ? "var(--success)" : "var(--danger)",
+              opacity: shuttingDown ? 0.6 : 1,
+            }}
+          >
+            {/* pill toggle */}
+            <div style={{ width: 36, height: 20, borderRadius: 10, background: siteDown ? "var(--danger)" : "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+              <div style={{ position: "absolute", top: 2, left: siteDown ? 18 : 2, width: 14, height: 14, borderRadius: "50%", background: "white", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
+            </div>
+            {shuttingDown ? "Updating…" : siteDown ? "Bring Online" : "Shut Down Site"}
+          </button>
+        </div>
+
+        {/* Custom message */}
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--brand-edge)" }}>
+          <label style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.09em", fontWeight: 600, display: "block", marginBottom: 7 }}>
+            Custom Maintenance Message (optional)
+          </label>
+          <div style={{ display: "flex", gap: 10 }}>
+            <input
+              className="g-input"
+              value={shutdownMsg}
+              onChange={e => setShutdownMsg(e.target.value)}
+              placeholder="e.g. We're upgrading the platform. Back in 30 minutes!"
+              style={{ flex: 1 }}
+            />
+            {siteDown && (
+              <button
+                onClick={() => handleToggleShutdown(true)}
+                disabled={shuttingDown}
+                style={{ padding: "10px 16px", borderRadius: "var(--r-md)", background: "rgba(201,162,75,0.1)", border: "1px solid rgba(201,162,75,0.25)", color: "#C9A24B", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                Update Message
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 6 }}>
+            Leave blank for the default Garuda maintenance message.
+          </div>
+        </div>
       </motion.div>
 
       {/* ── SESSION HISTORY ── */}

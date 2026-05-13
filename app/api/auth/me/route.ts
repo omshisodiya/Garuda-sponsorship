@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  const { user, globalTs, userTs } = await getUserWithForceLogout(session.sub)
+  const { user, globalTs, userTs, siteShutdown, shutdownMessage } = await getUserWithForceLogout(session.sub)
 
   if (!user || user.status === "disabled") {
     return NextResponse.json({ error: "User not found or disabled" }, { status: 401 })
@@ -22,5 +22,12 @@ export async function GET() {
     return NextResponse.json({ error: "Session invalidated by admin" }, { status: 401 })
   }
 
-  return NextResponse.json({ user: toPublic(user) })
+  // superadmin is never affected by site shutdown
+  const showShutdown = siteShutdown && user.role !== "superadmin"
+
+  return NextResponse.json({
+    user: toPublic(user),
+    siteShutdown: showShutdown,
+    shutdownMessage,
+  })
 }

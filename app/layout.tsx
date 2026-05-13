@@ -120,6 +120,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [readIds, setReadIds]   = useState<Set<number>>(new Set())
   const [idleWarning, setIdleWarning] = useState(false)
   const [idleSecsLeft, setIdleSecsLeft] = useState(WARN_SECS)
+  const [siteDown,    setSiteDown]    = useState(false)
+  const [downMsg,     setDownMsg]     = useState("")
   const idleTimerRef  = useRef<ReturnType<typeof setTimeout>  | null>(null)
   const warnTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
   const resetIdleRef  = useRef<(() => void) | null>(null)
@@ -140,6 +142,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           sessionStorage.setItem("g_role", data.user.role)
           sessionStorage.setItem("g_name", data.user.name)
         }
+        if (data?.siteShutdown) { setSiteDown(true); setDownMsg(data.shutdownMessage ?? "") }
+        else setSiteDown(false)
       })
       .catch(() => {})
     return () => window.clearTimeout(t)
@@ -228,6 +232,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           sessionStorage.removeItem("g_role")
           sessionStorage.removeItem("g_name")
           window.location.href = "/login"
+        } else if (res.ok) {
+          const data = await res.json()
+          if (data?.siteShutdown) { setSiteDown(true); setDownMsg(data.shutdownMessage ?? "") }
+          else setSiteDown(false)
         }
       } catch { /* network blip — ignore, next tick will retry */ }
     }, 180_000)
@@ -691,6 +699,58 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <span>↑↓ Navigate</span><span>Enter Open</span><span>Esc Close</span>
                 </div>
               </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* MAINTENANCE OVERLAY — shown to non-superadmins when site is shut down */}
+        <AnimatePresence>
+          {siteDown && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: "fixed", inset: 0, background: "var(--bg-0, #07070A)", zIndex: 99999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}
+            >
+              {/* ambient glow */}
+              <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: 400, height: 300, background: "radial-gradient(ellipse, rgba(201,162,75,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.15, type: "spring", stiffness: 260, damping: 28 }}
+                style={{ position: "relative", maxWidth: 460, width: "100%" }}
+              >
+                {/* Logo */}
+                <motion.div
+                  animate={{ boxShadow: ["0 0 20px rgba(201,162,75,0.2)", "0 0 40px rgba(201,162,75,0.4)", "0 0 20px rgba(201,162,75,0.2)"] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  style={{ width: 80, height: 80, borderRadius: 22, background: "rgba(201,162,75,0.08)", border: "1px solid rgba(201,162,75,0.25)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px", overflow: "hidden" }}
+                >
+                  <Image src="/garuda.png" alt="Garuda OS" width={80} height={80} style={{ width: 80, height: 80, objectFit: "cover" }} />
+                </motion.div>
+
+                {/* Badge */}
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "5px 14px", background: "rgba(201,162,75,0.08)", border: "1px solid rgba(201,162,75,0.2)", borderRadius: 100, marginBottom: 20 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#C9A24B", boxShadow: "0 0 8px rgba(201,162,75,0.8)", animation: "pulse 2s ease-in-out infinite" }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#C9A24B", letterSpacing: "0.12em", textTransform: "uppercase" }}>System Maintenance</span>
+                </div>
+
+                <h1 style={{ fontSize: "clamp(22px,4vw,34px)", fontWeight: 900, color: "var(--text-1, #F5F0E8)", margin: "0 0 14px", letterSpacing: "-0.02em", lineHeight: 1.15 }}>
+                  {downMsg
+                    ? downMsg
+                    : "Garuda OS is currently under maintenance"}
+                </h1>
+
+                <p style={{ fontSize: 13, color: "var(--text-3, #6B6860)", lineHeight: 1.7, margin: "0 0 32px" }}>
+                  {downMsg
+                    ? "The system will be back shortly. Thank you for your patience."
+                    : "We're making improvements to serve you better. The platform will be back online soon. Contact your administrator for updates."}
+                </p>
+
+                <div style={{ padding: "14px 20px", background: "rgba(201,162,75,0.05)", border: "1px solid rgba(201,162,75,0.12)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                  <Image src="/garuda.png" alt="" width={18} height={18} style={{ width: 18, height: 18, objectFit: "cover", borderRadius: 5, opacity: 0.7 }} />
+                  <span style={{ fontSize: 12, color: "var(--text-3, #6B6860)", fontWeight: 500 }}>Club Garuda · Manipal University Jaipur</span>
+                </div>
+              </motion.div>
+              <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
             </motion.div>
           )}
         </AnimatePresence>

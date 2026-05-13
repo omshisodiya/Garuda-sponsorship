@@ -198,28 +198,64 @@ export async function getUserById(id: string): Promise<User | null> {
   return rows[0] ? rowToUser(rows[0] as Row) : null
 }
 
-// Single query that fetches user + both force-logout timestamps together
+// Single query that fetches user + force-logout timestamps + site shutdown state
 export async function getUserWithForceLogout(id: string): Promise<{
-  user:     User | null
-  globalTs: string | null
-  userTs:   string | null
+  user:            User | null
+  globalTs:        string | null
+  userTs:          string | null
+  siteShutdown:    boolean
+  shutdownMessage: string
 }> {
   await ensureInit()
   const globalKey = "force_logout_all"
   const userKey   = `force_logout_user_${id}`
   const rows = await db()`
     SELECT u.*,
-      (SELECT value FROM garuda_settings WHERE key = ${globalKey}) AS global_logout,
-      (SELECT value FROM garuda_settings WHERE key = ${userKey})   AS user_logout
+      (SELECT value FROM garuda_settings WHERE key = ${globalKey})         AS global_logout,
+      (SELECT value FROM garuda_settings WHERE key = ${userKey})            AS user_logout,
+      (SELECT value FROM garuda_settings WHERE key = 'site_shutdown')       AS site_shutdown,
+      (SELECT value FROM garuda_settings WHERE key = 'shutdown_message')    AS shutdown_message
     FROM garuda_users u WHERE u.id = ${id}
   `
-  if (!rows[0]) return { user: null, globalTs: null, userTs: null }
+  if (!rows[0]) return { user: null, globalTs: null, userTs: null, siteShutdown: false, shutdownMessage: "" }
   const r = rows[0] as Row
   return {
-    user:     rowToUser(r),
-    globalTs: r.global_logout ? String(r.global_logout) : null,
-    userTs:   r.user_logout   ? String(r.user_logout)   : null,
+    user:            rowToUser(r),
+    globalTs:        r.global_logout     ? String(r.global_logout)     : null,
+    userTs:          r.user_logout       ? String(r.user_logout)       : null,
+    siteShutdown:    r.site_shutdown     === "true",
+    shutdownMessage: r.shutdown_message  ? String(r.shutdown_message)  : "",
   }
+}
+
+export async function getSiteShutdown(): Promise<{ enabled: boolean; message: string }> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT key, value FROM garuda_settings
+    WHERE key IN ('site_shutdown', 'shutdown_message')
+  `
+  let enabled = false
+  let message = ""
+  for (const r of rows) {
+    if (r.key === "site_shutdown") enabled = r.value === "true"
+    if (r.key === "shutdown_message") message = String(r.value ?? "")
+  }
+  return { enabled, message }
+}
+
+export async function setSiteShutdown(enabled: boolean, message: string): Promise<void> {
+  await ensureInit()
+  const sql = db()
+  await sql`
+    INSERT INTO garuda_settings (key, value, updated_at)
+    VALUES ('site_shutdown', ${enabled ? "true" : "false"}, now())
+    ON CONFLICT (key) DO UPDATE SET value = ${enabled ? "true" : "false"}, updated_at = now()
+  `
+  await sql`
+    INSERT INTO garuda_settings (key, value, updated_at)
+    VALUES ('shutdown_message', ${message}, now())
+    ON CONFLICT (key) DO UPDATE SET value = ${message}, updated_at = now()
+  `
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {

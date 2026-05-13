@@ -688,6 +688,7 @@ export default function LeadsPage() {
   const [selected,       setSelected]       = useState<Lead | null>(null)
   const [viewMode,       setViewMode]       = useState<"table" | "kanban">("table")
   const [myLeadsOnly,    setMyLeadsOnly]    = useState(false)
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [showImport,     setShowImport]     = useState(false)
   const [showAddForm,    setShowAddForm]    = useState(false)
   const [importFlash,    setImportFlash]    = useState("")
@@ -718,13 +719,18 @@ export default function LeadsPage() {
 
   const filtered = useMemo(() => {
     return leads.filter(l => {
-      const matchSearch = !search || [l.company, l.poc_name, l.poc_email, l.category, l.notes].some(f => f.toLowerCase().includes(search.toLowerCase()))
-      const matchStatus = statusFilter === "all" || l.status === statusFilter
-      const matchCat    = categoryFilter === "All" || l.category === categoryFilter
-      const matchMine   = !myLeadsOnly || l.assigned_to === currentUser?.id
-      return matchSearch && matchStatus && matchCat && matchMine
+      const matchSearch   = !search || [l.company, l.poc_name, l.poc_email, l.category, l.notes].some(f => f.toLowerCase().includes(search.toLowerCase()))
+      const matchStatus   = statusFilter === "all" || l.status === statusFilter
+      const matchCat      = categoryFilter === "All" || l.category === categoryFilter
+      const matchMine     = !myLeadsOnly || l.assigned_to === currentUser?.id
+      const matchAssignee = assigneeFilter === "all"
+        ? true
+        : assigneeFilter === "unassigned"
+          ? l.assigned_to === null
+          : l.assigned_to === assigneeFilter
+      return matchSearch && matchStatus && matchCat && matchMine && matchAssignee
     })
-  }, [leads, search, statusFilter, categoryFilter, myLeadsOnly, currentUser])
+  }, [leads, search, statusFilter, categoryFilter, myLeadsOnly, currentUser, assigneeFilter])
 
   function resolvedDealValue() {
     if (form.deal_preset === -1) return parseInt(form.deal_custom) || 0
@@ -868,9 +874,20 @@ export default function LeadsPage() {
         </div>
 
         {currentUser && currentUser.role !== "team" && (
+          <select className="g-select" value={assigneeFilter} onChange={e => { setAssigneeFilter(e.target.value); setMyLeadsOnly(false) }}
+            style={{ minWidth: 140, borderColor: assigneeFilter !== "all" ? "rgba(201,162,75,0.5)" : undefined, color: assigneeFilter !== "all" ? "#C9A24B" : undefined }}>
+            <option value="all">All Members</option>
+            <option value="unassigned">Unassigned</option>
+            {users.filter(u => u.role !== "superadmin").map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+        )}
+
+        {currentUser && currentUser.role !== "team" && (
           <div style={{ display: "flex", background: "rgba(0,0,0,0.25)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-sm)", overflow: "hidden", flexShrink: 0 }}>
             {(["all","mine"] as const).map(v => (
-              <button key={v} onClick={() => setMyLeadsOnly(v === "mine")}
+              <button key={v} onClick={() => { setMyLeadsOnly(v === "mine"); if (v === "mine") setAssigneeFilter("all") }}
                 style={{ padding: "7px 14px", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer",
                   background: (v === "mine") === myLeadsOnly ? "rgba(201,162,75,0.15)" : "transparent",
                   color: (v === "mine") === myLeadsOnly ? "#C9A24B" : "var(--text-3)",

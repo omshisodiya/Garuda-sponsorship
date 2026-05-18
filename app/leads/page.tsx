@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Search, Upload, Plus, X, Mail, Phone, ChevronRight,
   LayoutGrid, List, SlidersHorizontal, Download, Loader, Camera, Save, Check, Copy,
-  Flag, AlertTriangle, CheckCircle2,
+  Flag, AlertTriangle, CheckCircle2, Sparkles,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
@@ -1085,7 +1085,22 @@ export default function LeadsPage() {
   const [importFlash,    setImportFlash]    = useState("")
   const [addingLead,     setAddingLead]     = useState(false)
   const [mailLead,       setMailLead]       = useState<Lead | null>(null)
+  const [leadView,       setLeadView]       = useState<"new" | "old">("new")
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const LEGACY_CUTOFF = "2026-05-18"
+
+  // AI Prospect Generator
+  const [showProspects,      setShowProspects]      = useState(false)
+  const [prospects,          setProspects]          = useState<Array<{ name: string; category: string }>>([])
+  const [selectedProspects,  setSelectedProspects]  = useState<Set<number>>(new Set())
+  const [prospectSearch,     setProspectSearch]     = useState("")
+  const [prospectCatFilter,  setProspectCatFilter]  = useState("All")
+  const [generating,         setGenerating]         = useState(false)
+  const [prospectsSubmitting,setProspectsSubmitting]= useState(false)
+  const [prospectFlash,      setProspectFlash]      = useState("")
+  const prospectBufRef = useRef("")
+  const prospectFlushRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // new lead form state
   const [form, setForm] = useState({
@@ -1120,9 +1135,10 @@ export default function LeadsPage() {
           ? l.assigned_to === null
           : l.assigned_to === assigneeFilter
       const matchFlagged  = !showFlagged || l.flag_type !== null
-      return matchSearch && matchStatus && matchCat && matchMine && matchAssignee && matchFlagged
+      const matchAge      = leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF
+      return matchSearch && matchStatus && matchCat && matchMine && matchAssignee && matchFlagged && matchAge
     })
-  }, [leads, search, statusFilter, categoryFilter, myLeadsOnly, currentUser, assigneeFilter, showFlagged])
+  }, [leads, search, statusFilter, categoryFilter, myLeadsOnly, currentUser, assigneeFilter, showFlagged, leadView, LEGACY_CUTOFF])
 
   function resolvedDealValue() {
     if (form.deal_preset === -1) return parseInt(form.deal_custom) || 0
@@ -1243,6 +1259,93 @@ export default function LeadsPage() {
 
   const kanbanStages: LeadStage[] = ["prospect", "qualified", "proposal", "negotiation", "won", "lost"]
 
+  async function generateProspects() {
+    setGenerating(true)
+    setProspects([])
+    setSelectedProspects(new Set())
+    prospectBufRef.current = ""
+
+    const parsed: Array<{ name: string; category: string }> = []
+
+    prospectFlushRef.current = setInterval(() => {
+      const lines = prospectBufRef.current.split("\n")
+      prospectBufRef.current = lines.pop() ?? ""
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        const pipe = trimmed.indexOf("|")
+        if (pipe === -1) continue
+        const name = trimmed.slice(0, pipe).trim()
+        const category = trimmed.slice(pipe + 1).trim()
+        if (name) parsed.push({ name, category })
+      }
+      if (parsed.length > 0) setProspects([...parsed])
+    }, 150)
+
+    try {
+      const res = await fetch("/api/ai/prospects")
+      if (!res.ok || !res.body) throw new Error("Failed")
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = dec.decode(value, { stream: true })
+        for (const line of chunk.split("\n")) {
+          if (!line.startsWith("data: ")) continue
+          const data = line.slice(6).trim()
+          if (data === "[DONE]") continue
+          try {
+            const json = JSON.parse(data)
+            const token: string = json.choices?.[0]?.delta?.content ?? ""
+            if (token) prospectBufRef.current += token
+          } catch { /* skip malformed SSE */ }
+        }
+      }
+      // flush remaining buffer
+      const remaining = prospectBufRef.current.split("\n")
+      for (const line of remaining) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        const pipe = trimmed.indexOf("|")
+        if (pipe === -1) continue
+        const name = trimmed.slice(0, pipe).trim()
+        const category = trimmed.slice(pipe + 1).trim()
+        if (name) parsed.push({ name, category })
+      }
+      setProspects([...parsed])
+    } catch { /* silent */ } finally {
+      if (prospectFlushRef.current) clearInterval(prospectFlushRef.current)
+      setGenerating(false)
+    }
+  }
+
+  const prospectCategories = ["All", ...Array.from(new Set(prospects.map(p => p.category))).sort()]
+
+  const filteredProspects = prospects.filter(p => {
+    const matchSearch = !prospectSearch || p.name.toLowerCase().includes(prospectSearch.toLowerCase()) || p.category.toLowerCase().includes(prospectSearch.toLowerCase())
+    const matchCat = prospectCatFilter === "All" || p.category === prospectCatFilter
+    return matchSearch && matchCat
+  })
+
+  async function addProspectsToIntake() {
+    const toAdd = filteredProspects.filter((_, i) => selectedProspects.has(i))
+    if (toAdd.length === 0) return
+    setProspectsSubmitting(true)
+    try {
+      const res = await fetch("/api/intake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: toAdd.map(p => ({ name: p.name, company: p.name, notes: `AI-generated prospect — Category: ${p.category}` })) }),
+      })
+      if (res.ok) {
+        setProspectFlash(`${toAdd.length} prospect${toAdd.length > 1 ? "s" : ""} added to intake queue!`)
+        setSelectedProspects(new Set())
+        setTimeout(() => setProspectFlash(""), 3000)
+      }
+    } catch { /* silent */ } finally { setProspectsSubmitting(false) }
+  }
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: 12 }}>
@@ -1258,18 +1361,38 @@ export default function LeadsPage() {
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-        style={{ marginBottom: 20, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        style={{ marginBottom: 14, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
           <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>CRM · Lead Vault</div>
           <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: 0 }}>Lead Vault</h1>
-          <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>{filtered.length} of {leads.length} leads</p>
+          <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>{filtered.length} of {leads.filter(l => leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF).length} leads</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn-ghost" onClick={() => setShowImport(true)} style={{ fontSize: 11 }}><Upload size={13} /> Import Excel</button>
           <button className="btn-ghost" onClick={() => exportPerMember(leads, users)} style={{ fontSize: 11 }}><Download size={13} /> Export Report</button>
+          <button className="btn-ghost" onClick={() => { setShowProspects(true); if (prospects.length === 0) generateProspects() }} style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 5 }}><Sparkles size={13} /> AI Prospects</button>
           <button className="btn-gold" onClick={() => setShowAddForm(true)} style={{ fontSize: 11 }}><Plus size={13} /> Add Lead</button>
         </div>
       </motion.div>
+
+      {/* New / Old Leads toggle */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 14, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", alignSelf: "flex-start", width: "fit-content" }}>
+        {(["new", "old"] as const).map(v => {
+          const count = leads.filter(l => v === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF).length
+          return (
+            <button key={v} onClick={() => setLeadView(v)}
+              style={{ padding: "9px 20px", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 7,
+                background: leadView === v ? "rgba(201,162,75,0.12)" : "transparent",
+                color: leadView === v ? "#C9A24B" : "var(--text-3)",
+                borderRight: v === "new" ? "1px solid var(--brand-edge)" : "none" }}>
+              {v === "new" ? "New Leads" : "Old Leads"}
+              <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: leadView === v ? "rgba(201,162,75,0.2)" : "rgba(255,255,255,0.06)", color: leadView === v ? "#C9A24B" : "var(--text-3)", fontWeight: 800 }}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
@@ -1385,6 +1508,7 @@ export default function LeadsPage() {
                   <th>Status</th>
                   <th>Stage</th>
                   <th>Assigned</th>
+                  <th>Added By</th>
                   <th>Deal Value</th>
                   <th>Prob</th>
                   <th style={{ paddingRight: 16 }}>Actions</th>
@@ -1431,6 +1555,9 @@ export default function LeadsPage() {
                           </span>
                         </div>
                       ) : <span style={{ fontSize: 11, color: "var(--text-3)" }}>Unassigned</span>}
+                    </td>
+                    <td style={{ fontSize: 11, color: "var(--text-3)" }}>
+                      {users.find(u => u.id === lead.created_by)?.name.split(" ")[0] ?? "—"}
                     </td>
                     <td>
                       <div>
@@ -1645,6 +1772,121 @@ export default function LeadsPage() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
             style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 18px", background: "var(--success-bg)", border: "1px solid var(--success-edge)", borderRadius: "var(--r-md)", fontSize: 12, fontWeight: 700, color: "var(--success)", backdropFilter: "blur(10px)", zIndex: 9999 }}>
             {importFlash}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Prospect Generator Modal */}
+      <AnimatePresence>
+        {showProspects && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", backdropFilter: "blur(14px)", zIndex: 9998, display: "flex", flexDirection: "column" }}
+            onClick={() => setShowProspects(false)}>
+            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
+              transition={{ type: "spring", stiffness: 280, damping: 26 }}
+              style={{ display: "flex", flexDirection: "column", height: "100%", maxWidth: 860, width: "100%", margin: "0 auto", padding: "20px 16px 16px", boxSizing: "border-box" }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexShrink: 0 }}>
+                <div style={{ background: "rgba(201,162,75,0.12)", border: "1px solid rgba(201,162,75,0.3)", borderRadius: "var(--r-md)", padding: "8px 10px", display: "flex" }}>
+                  <Sparkles size={16} color="#C9A24B" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-1)" }}>AI Prospect Generator</div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>
+                    {generating ? `Generating… ${prospects.length} found so far` : prospects.length > 0 ? `${prospects.length} companies generated` : "Click Generate to get 1000+ Dandiya Night sponsor prospects"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={generateProspects} disabled={generating}
+                    style={{ fontSize: 11, padding: "7px 14px", borderRadius: "var(--r-sm)", border: "1px solid rgba(201,162,75,0.4)", background: "rgba(201,162,75,0.1)", color: "#C9A24B", cursor: generating ? "not-allowed" : "pointer", opacity: generating ? 0.6 : 1, fontFamily: "inherit", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {generating ? <><Loader size={11} style={{ animation: "spin 1s linear infinite" }} /> Generating…</> : <><Sparkles size={11} /> {prospects.length > 0 ? "Regenerate" : "Generate"}</>}
+                  </button>
+                  <button onClick={() => setShowProspects(false)} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", display: "flex" }}><X size={18} /></button>
+                </div>
+              </div>
+
+              {/* Search + category filter */}
+              {prospects.length > 0 && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 10, flexShrink: 0, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, padding: "0 12px", background: "rgba(0,0,0,0.35)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)" }}>
+                    <Search size={13} color="var(--text-3)" />
+                    <input value={prospectSearch} onChange={e => setProspectSearch(e.target.value)} placeholder="Search companies…"
+                      style={{ flex: 1, padding: "9px 0", background: "transparent", border: "none", color: "var(--text-1)", fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+                    {prospectSearch && <button onClick={() => setProspectSearch("")} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", display: "flex" }}><X size={12} /></button>}
+                  </div>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {prospectCategories.map(cat => (
+                      <button key={cat} onClick={() => setProspectCatFilter(cat)}
+                        style={{ padding: "6px 11px", borderRadius: "var(--r-sm)", border: `1px solid ${prospectCatFilter === cat ? "rgba(201,162,75,0.4)" : "rgba(201,162,75,0.1)"}`, background: prospectCatFilter === cat ? "rgba(201,162,75,0.1)" : "transparent", color: prospectCatFilter === cat ? "#C9A24B" : "var(--text-3)", fontSize: 10, fontWeight: prospectCatFilter === cat ? 700 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all 0.13s" }}>
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Select all bar */}
+              {filteredProspects.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexShrink: 0, padding: "6px 12px", background: "rgba(0,0,0,0.2)", borderRadius: "var(--r-sm)", border: "1px solid var(--border-1)" }}>
+                  <input type="checkbox"
+                    checked={filteredProspects.length > 0 && filteredProspects.every((_, i) => selectedProspects.has(i))}
+                    onChange={() => {
+                      const allIdxs = filteredProspects.map((_, i) => i)
+                      const allSelected = allIdxs.every(i => selectedProspects.has(i))
+                      setSelectedProspects(allSelected ? new Set() : new Set(allIdxs))
+                    }}
+                    style={{ cursor: "pointer", accentColor: "#C9A24B" }} />
+                  <span style={{ fontSize: 11, color: "var(--text-2)", flex: 1 }}>
+                    {selectedProspects.size > 0 ? `${selectedProspects.size} selected` : `${filteredProspects.length} shown`}
+                  </span>
+                  {selectedProspects.size > 0 && (
+                    <button onClick={addProspectsToIntake} disabled={prospectsSubmitting}
+                      className="btn-gold" style={{ fontSize: 10, padding: "5px 13px" }}>
+                      {prospectsSubmitting ? "Adding…" : `Add ${selectedProspects.size} to Intake`}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Company list */}
+              <div style={{ flex: 1, overflowY: "auto", borderRadius: "var(--r-md)", border: "1px solid var(--border-1)", background: "rgba(0,0,0,0.25)" }}>
+                {prospects.length === 0 && !generating && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 260, gap: 12, color: "var(--text-3)" }}>
+                    <Sparkles size={32} strokeWidth={1} />
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Click Generate to begin</div>
+                    <div style={{ fontSize: 11 }}>Groq AI will suggest 1000+ companies ideal for Dandiya Night sponsorship</div>
+                  </div>
+                )}
+                {prospects.length === 0 && generating && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 260, gap: 12, color: "var(--text-3)" }}>
+                    <Loader size={28} strokeWidth={1.5} style={{ animation: "spin 1s linear infinite" }} />
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>AI is generating prospects…</div>
+                    <div style={{ fontSize: 11 }}>This takes about 15–20 seconds</div>
+                  </div>
+                )}
+                {filteredProspects.map((p, i) => (
+                  <div key={i}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", background: selectedProspects.has(i) ? "rgba(201,162,75,0.06)" : "transparent", transition: "background 0.1s" }}
+                    onClick={() => setSelectedProspects(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })}>
+                    <input type="checkbox" checked={selectedProspects.has(i)} onChange={() => {}} style={{ cursor: "pointer", accentColor: "#C9A24B", flexShrink: 0 }} />
+                    <div style={{ flex: 1, fontSize: 12, color: "var(--text-1)", fontWeight: 500 }}>{p.name}</div>
+                    <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 20, background: "rgba(201,162,75,0.1)", border: "1px solid rgba(201,162,75,0.2)", color: "#C9A24B", fontWeight: 700, letterSpacing: "0.05em", flexShrink: 0 }}>{p.category}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Prospect flash */}
+              <AnimatePresence>
+                {prospectFlash && (
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    style={{ marginTop: 10, padding: "10px 16px", background: "var(--success-bg)", border: "1px solid var(--success-edge)", borderRadius: "var(--r-md)", fontSize: 12, fontWeight: 700, color: "var(--success)", flexShrink: 0, textAlign: "center" }}>
+                    {prospectFlash}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

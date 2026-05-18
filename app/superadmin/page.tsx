@@ -9,7 +9,7 @@ import {
   AlertTriangle, ArrowUpRight, RefreshCw,
   Database, GitBranch, PhoneCall, MessageSquare,
   IndianRupee, ChevronRight, X, Bell, Send, Users2,
-  LogOut, UserX,
+  LogOut, UserX, Inbox, Trash2, Mail,
 } from "lucide-react"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -602,6 +602,14 @@ export default function SuperAdminDashboard() {
   const [siteDown,           setSiteDown]           = useState(false)
   const [shutdownMsg,        setShutdownMsg]        = useState("")
   const [shuttingDown,       setShuttingDown]       = useState(false)
+  const [lbResetMsg,         setLbResetMsg]         = useState("")
+  const [lbResetting,        setLbResetting]        = useState(false)
+  const [lbLastReset,        setLbLastReset]        = useState<string | null>(null)
+  const [lbConfirm,          setLbConfirm]          = useState(false)
+  const [xpPenalty,          setXpPenalty]          = useState(0)
+  const [xpPenaltyInput,     setXpPenaltyInput]     = useState("0")
+  const [xpPenaltySaving,    setXpPenaltySaving]    = useState(false)
+  const [xpPenaltySaved,     setXpPenaltySaved]     = useState(false)
 
   type NotifHistory = {
     id: number; title: string; body: string; url?: string
@@ -618,6 +626,31 @@ export default function SuperAdminDashboard() {
   const [notifHistory,     setNotifHistory]      = useState<NotifHistory[]>([])
   const [notifError,       setNotifError]        = useState("")
   const [notifSubCount,    setNotifSubCount]     = useState<{ total: number; byRole: Record<string, number> } | null>(null)
+
+  type IntakeLead = {
+    id: string; name: string; company: string; phone: string; email: string
+    notes: string; submitted_by: string; submitted_by_name: string
+    status: "new" | "working" | "dead" | "graduated"
+    graduated_lead_id: string | null; created_at: string
+  }
+  const INTAKE_BADGE: Record<string, string> = {
+    new: "badge-blue", working: "badge-gold", dead: "badge-red", graduated: "badge-green",
+  }
+  function intakeRelativeTime(ts: string): string {
+    const diff = Date.now() - new Date(ts).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return "just now"
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.floor(hrs / 24)}d ago`
+  }
+
+  const [intakeLeads,      setIntakeLeads]      = useState<IntakeLead[]>([])
+  const [intakeFilter,     setIntakeFilter]     = useState<"all"|"new"|"working"|"dead"|"graduated">("all")
+  const [graduateConfirm,  setGraduateConfirm]  = useState<string | null>(null)
+  const [deleteConfirm,    setDeleteConfirm]    = useState<string | null>(null)
+  const [intakeWorking,    setIntakeWorking]     = useState<string | null>(null)
 
   const stats = useMemo(() => computeStats(leads), [leads])
 
@@ -772,20 +805,55 @@ export default function SuperAdminDashboard() {
     }
   }
 
+  async function handleSAGraduate(id: string) {
+    setIntakeWorking(id)
+    try {
+      const res = await fetch(`/api/intake/${id}/graduate`, { method: "POST" })
+      if (res.ok) {
+        setIntakeLeads(prev => prev.map(l => l.id === id ? { ...l, status: "graduated" as const } : l))
+        setGraduateConfirm(null)
+      }
+    } catch { /* silent */ } finally { setIntakeWorking(null) }
+  }
+
+  async function handleSAIntakeDelete(id: string) {
+    setIntakeWorking(id)
+    try {
+      const res = await fetch(`/api/intake/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setIntakeLeads(prev => prev.filter(l => l.id !== id))
+        setDeleteConfirm(null)
+      }
+    } catch { /* silent */ } finally { setIntakeWorking(null) }
+  }
+
+  async function handleSAIntakeStatus(id: string, status: string) {
+    setIntakeWorking(id)
+    try {
+      const res = await fetch(`/api/intake/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+      if (res.ok) setIntakeLeads(prev => prev.map(l => l.id === id ? { ...l, status: status as IntakeLead["status"] } : l))
+    } catch { /* silent */ } finally { setIntakeWorking(null) }
+  }
+
   async function loadLeads() {
     try {
-      const [leadsRes, usersRes, sessionsData, historyData, statusData] = await Promise.all([
+      const [leadsRes, usersRes, sessionsData, historyData, statusData, intakeRes] = await Promise.all([
         fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
         fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
         fetch("/api/audit/sessions").then(r => r.ok ? r.json() : null).catch(() => null),
         fetch("/api/push/history").then(r => r.ok ? r.json() : null).catch(() => null),
         fetch("/api/push/status").then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch("/api/intake").then(r => r.ok ? r.json() : null).catch(() => null),
       ])
       if (leadsRes)    setLeads(leadsRes.leads ?? [])
       if (usersRes)    setUsers(usersRes.users ?? [])
       if (sessionsData) setSessions(sessionsData.sessions ?? [])
       if (historyData)  setNotifHistory(historyData.notifications ?? [])
       if (statusData)   setNotifSubCount(statusData)
+      if (intakeRes)    setIntakeLeads(intakeRes.leads ?? [])
     } catch { /* silent */ } finally {
       setDataLoading(false)
       setLastUpdated(
@@ -794,9 +862,46 @@ export default function SuperAdminDashboard() {
     }
   }
 
+  async function handleSaveXpPenalty() {
+    const pct = Math.min(100, Math.max(0, parseInt(xpPenaltyInput, 10) || 0))
+    setXpPenaltySaving(true)
+    try {
+      await fetch("/api/system/xp-penalty", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ percent: pct }),
+      })
+      setXpPenalty(pct)
+      setXpPenaltyInput(String(pct))
+      setXpPenaltySaved(true)
+      setTimeout(() => setXpPenaltySaved(false), 2000)
+    } finally { setXpPenaltySaving(false) }
+  }
+
+  async function handleResetLeaderboard() {
+    setLbResetting(true)
+    try {
+      await fetch("/api/system/leaderboard-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: lbResetMsg }),
+      })
+      setLbLastReset(new Date().toISOString())
+      setLbConfirm(false)
+    } finally { setLbResetting(false) }
+  }
+
   useEffect(() => {
     fetch("/api/system/shutdown").then(r => r.ok ? r.json() : null).then(d => {
       if (d) { setSiteDown(d.enabled); setShutdownMsg(d.message ?? "") }
+    }).catch(() => {})
+
+    fetch("/api/system/leaderboard-reset").then(r => r.ok ? r.json() : null).then(d => {
+      if (d) { setLbResetMsg(d.message ?? ""); setLbLastReset(d.resetAt ?? null) }
+    }).catch(() => {})
+
+    fetch("/api/system/xp-penalty").then(r => r.ok ? r.json() : null).then(d => {
+      if (d) { setXpPenalty(d.percent ?? 0); setXpPenaltyInput(String(d.percent ?? 0)) }
     }).catch(() => {})
 
     Promise.all([
@@ -805,12 +910,14 @@ export default function SuperAdminDashboard() {
       fetch("/api/audit/sessions").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/push/history").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/push/status").then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([leadsData, usersData, sessionsData, historyData, statusData]) => {
+      fetch("/api/intake").then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([leadsData, usersData, sessionsData, historyData, statusData, intakeData]) => {
       if (leadsData)    setLeads(leadsData.leads ?? [])
       if (usersData)    setUsers(usersData.users ?? [])
       if (sessionsData) setSessions(sessionsData.sessions ?? [])
       if (historyData)  setNotifHistory(historyData.notifications ?? [])
       if (statusData)   setNotifSubCount(statusData)
+      if (intakeData)   setIntakeLeads(intakeData.leads ?? [])
     }).catch(() => {}).finally(() => {
       setDataLoading(false)
       setLastUpdated(
@@ -2008,6 +2115,100 @@ export default function SuperAdminDashboard() {
         )}
       </motion.div>
 
+      {/* ── LEADERBOARD RESET ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.78, duration: 0.5 }}
+        className="panel"
+        style={{ marginTop: 20 }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <div className="g-label" style={{ marginBottom: 4 }}>Superadmin Only</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>Leaderboard Reset</div>
+            <div style={{ fontSize: 12, color: "var(--text-3)", maxWidth: 500, lineHeight: 1.6 }}>
+              Clears all verified mission XP. Lead-based XP remains tied to deal progress.
+              {lbLastReset && (
+                <span style={{ marginLeft: 8, color: "var(--text-3)", fontSize: 11 }}>
+                  Last reset: {new Date(lbLastReset).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setLbConfirm(true)}
+            disabled={lbResetting}
+            style={{
+              flexShrink: 0, display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 20px", borderRadius: "var(--r-md)", fontFamily: "inherit",
+              fontSize: 12, fontWeight: 700, cursor: lbResetting ? "not-allowed" : "pointer",
+              background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)",
+              color: "#A78BFA", opacity: lbResetting ? 0.6 : 1,
+            }}
+          >
+            Reset Leaderboard
+          </button>
+        </div>
+
+        {/* Optional message input */}
+        <div style={{ marginTop: 16, display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            value={lbResetMsg}
+            onChange={e => setLbResetMsg(e.target.value)}
+            placeholder="Optional message shown on leaderboard after reset (e.g. Season 2 starts now!)"
+            style={{ flex: 1, padding: "8px 12px", background: "rgba(0,0,0,0.25)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", color: "var(--text-1)", fontSize: 12, fontFamily: "inherit", outline: "none" }}
+            onFocus={e => { e.target.style.borderColor = "#A78BFA" }}
+            onBlur={e => { e.target.style.borderColor = "var(--brand-edge)" }}
+          />
+        </div>
+
+        {/* XP Adjustment (hidden from team) */}
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 8, fontWeight: 600 }}>
+            Global XP Reduction — applied silently to all scores
+            {xpPenalty > 0 && <span style={{ marginLeft: 8, color: "#A78BFA", fontWeight: 700 }}>({xpPenalty}% active)</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="number" min={0} max={100}
+              value={xpPenaltyInput}
+              onChange={e => setXpPenaltyInput(e.target.value)}
+              placeholder="0–100"
+              style={{ width: 90, padding: "7px 10px", background: "rgba(0,0,0,0.25)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", color: "var(--text-1)", fontSize: 12, fontFamily: "inherit", outline: "none" }}
+              onFocus={e => { e.target.style.borderColor = "#A78BFA" }}
+              onBlur={e => { e.target.style.borderColor = "var(--brand-edge)" }}
+            />
+            <span style={{ fontSize: 11, color: "var(--text-3)" }}>% reduction on displayed XP</span>
+            <button onClick={handleSaveXpPenalty} disabled={xpPenaltySaving}
+              style={{ padding: "7px 14px", fontSize: 11, fontWeight: 700, background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", color: "#A78BFA", borderRadius: "var(--r-sm)", cursor: xpPenaltySaving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: xpPenaltySaving ? 0.6 : 1 }}>
+              {xpPenaltySaving ? "Saving…" : xpPenaltySaved ? "Saved ✓" : "Apply"}
+            </button>
+          </div>
+        </div>
+
+        {/* Confirm prompt */}
+        <AnimatePresence>
+          {lbConfirm && (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              style={{ marginTop: 14, padding: "14px 16px", background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: "var(--r-md)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
+                This will <strong style={{ color: "#A78BFA" }}>permanently delete all verified mission claims</strong>. Are you sure?
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setLbConfirm(false)}
+                  style={{ padding: "7px 14px", fontSize: 11, fontWeight: 700, background: "transparent", border: "1px solid var(--brand-edge)", color: "var(--text-3)", borderRadius: "var(--r-sm)", cursor: "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+                <button onClick={handleResetLeaderboard} disabled={lbResetting}
+                  style={{ padding: "7px 14px", fontSize: 11, fontWeight: 700, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", color: "#A78BFA", borderRadius: "var(--r-sm)", cursor: lbResetting ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: lbResetting ? 0.6 : 1 }}>
+                  {lbResetting ? "Resetting…" : "Yes, Reset"}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
       {/* ── SITE SHUTDOWN ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -2172,6 +2373,100 @@ export default function SuperAdminDashboard() {
           </div>
         )}
       </motion.div>
+      {/* ── INTAKE QUEUE ── */}
+      {(() => {
+        const filteredIntake = intakeFilter === "all" ? intakeLeads : intakeLeads.filter(l => l.status === intakeFilter)
+        const intakePending  = intakeLeads.filter(l => l.status === "new").length
+        return (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.95, duration: 0.5 }}
+            className="panel" style={{ marginTop: 20, padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "14px 22px 10px", borderBottom: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Inbox size={14} color="#60A5FA" strokeWidth={1.6} />
+                <div className="g-label">Intake Queue</div>
+                {intakePending > 0 && (
+                  <span style={{ background: "#60A5FA18", color: "#60A5FA", border: "1px solid #60A5FA30", borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
+                    {intakePending} new
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {(["all","new","working","dead","graduated"] as const).map(f => (
+                  <button key={f} onClick={() => setIntakeFilter(f)}
+                    style={{ fontSize: 9, padding: "4px 10px", borderRadius: "var(--r-sm)", cursor: "pointer", border: `1px solid ${intakeFilter === f ? "var(--brand-edge)" : "transparent"}`, background: intakeFilter === f ? "rgba(201,162,75,0.1)" : "transparent", color: intakeFilter === f ? "#C9A24B" : "var(--text-3)", fontWeight: intakeFilter === f ? 700 : 500, fontFamily: "inherit" }}>
+                    {f === "all" ? `All (${intakeLeads.length})` : `${f[0].toUpperCase()}${f.slice(1)} (${intakeLeads.filter(l => l.status === f).length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {filteredIntake.length === 0 ? (
+              <div style={{ padding: "28px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+                {intakeLeads.length === 0 ? "No leads submitted to intake yet." : `No ${intakeFilter} leads`}
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="g-table">
+                  <thead>
+                    <tr>
+                      <th>Status</th><th>Lead</th><th>Company</th><th>Phone</th><th>Email</th><th>Submitted By</th><th>Date</th><th style={{ minWidth: 200 }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredIntake.map((lead, i) => {
+                      const isWorking = intakeWorking === lead.id
+                      const showGradConf = graduateConfirm === lead.id
+                      const showDelConf  = deleteConfirm  === lead.id
+                      return (
+                        <motion.tr key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
+                          <td><span className={`badge ${INTAKE_BADGE[lead.status]}`} style={{ fontSize: 9 }}>{lead.status}</span></td>
+                          <td style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{lead.name}</td>
+                          <td style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.company || "—"}</td>
+                          <td>{lead.phone ? <button className="btn-ghost" style={{ fontSize: 10, padding: "3px 8px" }} onClick={() => window.open(`tel:${lead.phone}`)}><PhoneCall size={10} /> {lead.phone}</button> : <span style={{ color: "var(--text-3)", fontSize: 11 }}>—</span>}</td>
+                          <td>{lead.email ? <button className="btn-ghost" style={{ fontSize: 10, padding: "3px 8px" }} onClick={() => window.open(`mailto:${lead.email}`)}><Mail size={10} /> {lead.email}</button> : <span style={{ color: "var(--text-3)", fontSize: 11 }}>—</span>}</td>
+                          <td style={{ fontSize: 11, color: "var(--text-3)" }}>{lead.submitted_by_name}</td>
+                          <td style={{ fontSize: 11, color: "var(--text-3)" }}>{intakeRelativeTime(lead.created_at)}</td>
+                          <td>
+                            <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                              {isWorking ? (
+                                <div style={{ width: 14, height: 14, border: "2px solid rgba(201,162,75,0.25)", borderTop: "2px solid #C9A24B", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                              ) : showGradConf ? (
+                                <>
+                                  <span style={{ fontSize: 10, color: "var(--text-3)", marginRight: 2 }}>Graduate?</span>
+                                  <button className="btn-gold" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => handleSAGraduate(lead.id)}>Yes</button>
+                                  <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => setGraduateConfirm(null)}>No</button>
+                                </>
+                              ) : showDelConf ? (
+                                <>
+                                  <span style={{ fontSize: 10, color: "var(--danger)", marginRight: 2 }}>Delete?</span>
+                                  <button className="btn-danger" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => handleSAIntakeDelete(lead.id)}>Yes</button>
+                                  <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => setDeleteConfirm(null)}>No</button>
+                                </>
+                              ) : (
+                                <>
+                                  {lead.status !== "graduated" && (
+                                    <button className="btn-gold" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => { setGraduateConfirm(lead.id); setDeleteConfirm(null) }}>
+                                      <ArrowUpRight size={10} /> Graduate
+                                    </button>
+                                  )}
+                                  {lead.status === "new" && <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px", color: "#C9A24B" }} onClick={() => handleSAIntakeStatus(lead.id, "working")}>Working</button>}
+                                  {lead.status === "working" && <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px", color: "var(--danger)" }} onClick={() => handleSAIntakeStatus(lead.id, "dead")}>Dead</button>}
+                                  {lead.status === "dead" && <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px", color: "#60A5FA" }} onClick={() => handleSAIntakeStatus(lead.id, "new")}>Reopen</button>}
+                                  <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 6px", color: "var(--danger)" }} onClick={() => { setDeleteConfirm(lead.id); setGraduateConfirm(null) }}><Trash2 size={10} /></button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
+        )
+      })()}
+
     </div>
     </>
   )

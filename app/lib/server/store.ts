@@ -258,6 +258,52 @@ export async function setSiteShutdown(enabled: boolean, message: string): Promis
   `
 }
 
+export async function getLeaderboardReset(): Promise<{ message: string; resetAt: string | null }> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT key, value FROM garuda_settings
+    WHERE key IN ('leaderboard_reset_message', 'leaderboard_reset_at')
+  `
+  let message = ""
+  let resetAt: string | null = null
+  for (const r of rows) {
+    if (r.key === "leaderboard_reset_message") message = String(r.value ?? "")
+    if (r.key === "leaderboard_reset_at")      resetAt = String(r.value ?? "")
+  }
+  return { message, resetAt: resetAt || null }
+}
+
+export async function setLeaderboardReset(message: string): Promise<void> {
+  await ensureInit()
+  const sql = db()
+  await sql`
+    INSERT INTO garuda_settings (key, value, updated_at)
+    VALUES ('leaderboard_reset_message', ${message}, now())
+    ON CONFLICT (key) DO UPDATE SET value = ${message}, updated_at = now()
+  `
+  await sql`
+    INSERT INTO garuda_settings (key, value, updated_at)
+    VALUES ('leaderboard_reset_at', ${new Date().toISOString()}, now())
+    ON CONFLICT (key) DO UPDATE SET value = ${new Date().toISOString()}, updated_at = now()
+  `
+}
+
+export async function getXpPenalty(): Promise<number> {
+  await ensureInit()
+  const rows = await db()`SELECT value FROM garuda_settings WHERE key = 'xp_penalty_percent' LIMIT 1`
+  return rows[0] ? Math.min(100, Math.max(0, parseInt(String(rows[0].value ?? "0"), 10))) : 0
+}
+
+export async function setXpPenalty(percent: number): Promise<void> {
+  await ensureInit()
+  const clamped = Math.min(100, Math.max(0, Math.round(percent)))
+  await db()`
+    INSERT INTO garuda_settings (key, value, updated_at)
+    VALUES ('xp_penalty_percent', ${String(clamped)}, now())
+    ON CONFLICT (key) DO UPDATE SET value = ${String(clamped)}, updated_at = now()
+  `
+}
+
 export async function getUserByUsername(username: string): Promise<User | null> {
   await ensureInit()
   const rows = await db()`

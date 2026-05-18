@@ -58,12 +58,14 @@ export default function AssignPage() {
   const [bulkTarget, setBulkTarget] = useState<string>("")
   const [distributing,    setDistributing]    = useState(false)
   const [unassignedOnly,  setUnassignedOnly]  = useState(false)
+  const [intakePending,   setIntakePending]   = useState(0)
 
   useEffect(() => {
     Promise.all([
       fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([leadsData, usersData]) => {
+      fetch("/api/intake").then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([leadsData, usersData, intakeData]) => {
       if (leadsData) setLeads(leadsData.leads ?? [])
       if (usersData) {
         const displayUsers = (usersData.users ?? []).map(toDisplayUser)
@@ -72,6 +74,10 @@ export default function AssignPage() {
           const firstTeam = displayUsers.find((u: DisplayUser) => u.role === "team") ?? displayUsers[0]
           setBulkTarget(firstTeam.id)
         }
+      }
+      if (intakeData) {
+        const pending = (intakeData.leads ?? []).filter((l: { status: string }) => l.status === "new" || l.status === "working").length
+        setIntakePending(pending)
       }
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -213,6 +219,11 @@ export default function AssignPage() {
           <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>
             {leads.length} leads · {leads.length - unassigned} assigned · {unassigned} unassigned
           </p>
+          {intakePending > 0 && (
+            <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "var(--r-sm)", fontSize: 11, color: "#60A5FA", fontWeight: 600 }}>
+              {intakePending} intake lead{intakePending > 1 ? "s" : ""} pending review — go to Admin to graduate them to vault
+            </div>
+          )}
         </div>
         <button
           className="btn-gold"

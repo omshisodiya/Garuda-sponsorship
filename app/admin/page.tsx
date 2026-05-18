@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Users, Lock, Unlock, Activity, Target, TrendingUp,
-  PhoneCall, Mail, AlertTriangle, CheckCircle, Loader,
+  PhoneCall, Mail, AlertTriangle, CheckCircle, Loader, Trophy,
+  Inbox, Trash2, ArrowUpRight,
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { useSecurityStore } from "../lib/securityStore"
@@ -12,13 +14,27 @@ import { TEAM, ALERTS, CLUB } from "../lib/data"
 import type { Lead } from "../lib/data"
 import type { AuditEntry } from "../lib/server/store"
 
+type LbEntry  = { id: string; name: string; initials: string; color: string; xp: number; leadXp: number; missionXp: number }
+type LbMeta   = { resetMessage: string; resetAt: string | null }
+type IntakeLead = {
+  id: string; name: string; company: string; phone: string; email: string
+  notes: string; submitted_by: string; submitted_by_name: string
+  status: "new" | "working" | "dead" | "graduated"
+  graduated_lead_id: string | null; created_at: string
+}
+
+const INTAKE_BADGE: Record<string, string> = {
+  new: "badge-blue", working: "badge-gold", dead: "badge-red", graduated: "badge-green",
+}
+
 function actionIcon(action: string) {
-  if (action.includes("password"))     return <Lock    size={12} color="var(--warning)"  strokeWidth={1.6} />
-  if (action.includes("lead_created")) return <Target  size={12} color="var(--info)"     strokeWidth={1.6} />
-  if (action.includes("lead_updated")) return <Activity size={12} color="#A78BFA"          strokeWidth={1.6} />
-  if (action.includes("login"))        return <Users    size={12} color="var(--success)"  strokeWidth={1.6} />
+  if (action.includes("password"))     return <Lock      size={12} color="var(--warning)"  strokeWidth={1.6} />
+  if (action.includes("lead_created")) return <Target    size={12} color="var(--info)"     strokeWidth={1.6} />
+  if (action.includes("lead_updated")) return <Activity  size={12} color="#A78BFA"          strokeWidth={1.6} />
+  if (action.includes("login"))        return <Users     size={12} color="var(--success)"  strokeWidth={1.6} />
   if (action.includes("role"))         return <TrendingUp size={12} color="var(--warning)" strokeWidth={1.6} />
-  return                                      <Mail     size={12} color="var(--text-3)"   strokeWidth={1.6} />
+  if (action.includes("intake"))       return <Inbox     size={12} color="#60A5FA"          strokeWidth={1.6} />
+  return                                      <Mail      size={12} color="var(--text-3)"   strokeWidth={1.6} />
 }
 
 function relativeTime(ts: string): string {
@@ -42,36 +58,55 @@ function ChartTip({ active, payload, label }: { active?: boolean; payload?: Arra
 }
 
 export default function AdminPage() {
+  const router = useRouter()
   const { teamLocked, setTeamLocked } = useSecurityStore()
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [leads,       setLeads]       = useState<Lead[]>([])
-  const [audit,       setAudit]       = useState<AuditEntry[]>([])
-  const [loading,     setLoading]     = useState(true)
+
+  const [showConfirm,   setShowConfirm]   = useState(false)
+  const [leads,         setLeads]         = useState<Lead[]>([])
+  const [audit,         setAudit]         = useState<AuditEntry[]>([])
+  const [leaderboard,   setLeaderboard]   = useState<LbEntry[]>([])
+  const [lbMeta,        setLbMeta]        = useState<LbMeta>({ resetMessage: "", resetAt: null })
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [loading,       setLoading]       = useState(true)
+
+  // intake
+  const [intakeLeads,    setIntakeLeads]    = useState<IntakeLead[]>([])
+  const [intakeFilter,   setIntakeFilter]   = useState<"all" | "new" | "working" | "dead" | "graduated">("all")
+  const [graduateConfirm, setGraduateConfirm] = useState<string | null>(null)
+  const [deleteConfirm,   setDeleteConfirm]   = useState<string | null>(null)
+  const [intakeWorking,   setIntakeWorking]   = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
       try {
-        const [leadsRes, auditRes] = await Promise.all([
+        const [leadsRes, auditRes, lbRes, meRes, intakeRes] = await Promise.all([
           fetch("/api/leads"),
           fetch("/api/audit?limit=10"),
+          fetch("/api/leaderboard"),
+          fetch("/api/auth/me"),
+          fetch("/api/intake"),
         ])
-        if (leadsRes.ok)  setLeads((await leadsRes.json()).leads ?? [])
-        if (auditRes.ok)  setAudit((await auditRes.json()).entries ?? [])
-      } catch { /* silent */ } finally {
-        setLoading(false)
-      }
+        if (leadsRes.ok)   setLeads((await leadsRes.json()).leads ?? [])
+        if (auditRes.ok)   setAudit((await auditRes.json()).entries ?? [])
+        if (lbRes.ok) {
+          const d = await lbRes.json()
+          setLeaderboard(d.ranked ?? [])
+          setLbMeta({ resetMessage: d.resetMessage ?? "", resetAt: d.resetAt ?? null })
+        }
+        if (meRes.ok)      setCurrentUserId((await meRes.json()).user?.id ?? null)
+        if (intakeRes.ok)  setIntakeLeads((await intakeRes.json()).leads ?? [])
+      } catch { /* silent */ } finally { setLoading(false) }
     }
     load()
   }, [])
 
   const stats = useMemo(() => {
-    const confirmed    = leads.filter(l => l.status === "confirmed")
-    const secured      = confirmed.reduce((s, l) => s + l.deal_value, 0)
+    const confirmed = leads.filter(l => l.status === "confirmed")
     return {
       total:     leads.length,
       assigned:  leads.filter(l => l.assigned_to !== null).length,
       confirmed: confirmed.length,
-      secured,
+      secured:   confirmed.reduce((s, l) => s + l.deal_value, 0),
     }
   }, [leads])
 
@@ -81,33 +116,62 @@ export default function AdminPage() {
     adminTeam.map(member => {
       const myLeads   = leads.filter(l => l.assigned_to === member.id)
       const confirmed = myLeads.filter(l => l.status === "confirmed")
-      return {
-        ...member,
-        totalLeads: myLeads.length,
-        confirmed:  confirmed.length,
-        secured:    confirmed.reduce((s, l) => s + l.deal_value, 0),
-      }
+      return { ...member, totalLeads: myLeads.length, confirmed: confirmed.length, secured: confirmed.reduce((s, l) => s + l.deal_value, 0) }
     }), [leads, adminTeam]
   )
 
   const chartData = adminTeam.map(m => {
     const mine = leads.filter(l => l.assigned_to === m.id)
-    return {
-      name:      m.name.split(" ")[0],
-      leads:     mine.length,
-      confirmed: mine.filter(l => l.status === "confirmed").length,
-    }
+    return { name: m.name.split(" ")[0], leads: mine.length, confirmed: mine.filter(l => l.status === "confirmed").length }
   })
 
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: 12 }}>
-        <Loader size={24} color="var(--text-3)" strokeWidth={1.5} style={{ animation: "spin 1s linear infinite" }} />
-        <div style={{ fontSize: 13, color: "var(--text-3)" }}>Loading console…</div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
-    )
+  const filteredIntake = useMemo(() =>
+    intakeFilter === "all" ? intakeLeads : intakeLeads.filter(l => l.status === intakeFilter)
+  , [intakeLeads, intakeFilter])
+
+  const intakePending = intakeLeads.filter(l => l.status === "new").length
+
+  // ── Intake actions ─────────────────────────────────────────────────────────
+  async function handleGraduate(id: string) {
+    setIntakeWorking(id)
+    try {
+      const res = await fetch(`/api/intake/${id}/graduate`, { method: "POST" })
+      if (res.ok) {
+        setIntakeLeads(prev => prev.map(l => l.id === id ? { ...l, status: "graduated" } : l))
+        setGraduateConfirm(null)
+      }
+    } catch { /* silent */ } finally { setIntakeWorking(null) }
   }
+
+  async function handleIntakeDelete(id: string) {
+    setIntakeWorking(id)
+    try {
+      const res = await fetch(`/api/intake/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setIntakeLeads(prev => prev.filter(l => l.id !== id))
+        setDeleteConfirm(null)
+      }
+    } catch { /* silent */ } finally { setIntakeWorking(null) }
+  }
+
+  async function handleIntakeStatus(id: string, status: string) {
+    setIntakeWorking(id)
+    try {
+      const res = await fetch(`/api/intake/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+      if (res.ok) setIntakeLeads(prev => prev.map(l => l.id === id ? { ...l, status: status as IntakeLead["status"] } : l))
+    } catch { /* silent */ } finally { setIntakeWorking(null) }
+  }
+
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: 12 }}>
+      <Loader size={24} color="var(--text-3)" strokeWidth={1.5} style={{ animation: "spin 1s linear infinite" }} />
+      <div style={{ fontSize: 13, color: "var(--text-3)" }}>Loading console…</div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1500, margin: "0 auto" }}>
@@ -132,13 +196,13 @@ export default function AdminPage() {
         </div>
       </motion.div>
 
-      {/* KPI Row */}
+      {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Total Leads",     value: stats.total,     icon: <Target size={16} strokeWidth={1.5} />,     color: "#60A5FA", sub: `${stats.total - stats.assigned} unassigned` },
-          { label: "Assigned",        value: stats.assigned,  icon: <Users size={16} strokeWidth={1.5} />,      color: "#C9A24B", sub: `${Math.round(stats.assigned / Math.max(stats.total, 1) * 100)}% coverage` },
+          { label: "Total Leads",     value: stats.total,     icon: <Target      size={16} strokeWidth={1.5} />, color: "#60A5FA", sub: `${stats.total - stats.assigned} unassigned` },
+          { label: "Assigned",        value: stats.assigned,  icon: <Users       size={16} strokeWidth={1.5} />, color: "#C9A24B", sub: `${Math.round(stats.assigned / Math.max(stats.total, 1) * 100)}% coverage` },
           { label: "Confirmed",       value: stats.confirmed, icon: <CheckCircle size={16} strokeWidth={1.5} />, color: "#4ADE80", sub: `${Math.round(stats.confirmed / Math.max(stats.total, 1) * 100)}% win rate` },
-          { label: "Revenue Secured", value: stats.secured,   icon: <TrendingUp size={16} strokeWidth={1.5} />, color: "#A78BFA", prefix: "₹", format: (v: number) => v.toLocaleString("en-IN"), sub: `of ₹${CLUB.target.toLocaleString("en-IN")} target` },
+          { label: "Revenue Secured", value: stats.secured,   icon: <TrendingUp  size={16} strokeWidth={1.5} />, color: "#A78BFA", prefix: "₹", format: (v: number) => v.toLocaleString("en-IN"), sub: `of ₹${CLUB.target.toLocaleString("en-IN")} target` },
         ].map((kpi, i) => (
           <motion.div key={kpi.label} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="kpi-card">
             <div style={{ position: "absolute", top: 0, left: 0, width: 36, height: 2.5, background: kpi.color, borderRadius: "18px 0 3px 0" }} />
@@ -157,7 +221,6 @@ export default function AdminPage() {
         {/* Left */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* Team Performance Table */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="panel" style={{ padding: 0, overflow: "hidden" }}>
             <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid var(--brand-edge)" }}>
               <div className="g-label">Team Performance</div>
@@ -165,14 +228,7 @@ export default function AdminPage() {
             <div style={{ overflowX: "auto" }}>
               <table className="g-table">
                 <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Role</th>
-                    <th>Leads</th>
-                    <th>Confirmed</th>
-                    <th>Secured</th>
-                    <th>Progress</th>
-                  </tr>
+                  <tr><th>Member</th><th>Role</th><th>Leads</th><th>Confirmed</th><th>Secured</th><th>Progress</th></tr>
                 </thead>
                 <tbody>
                   {team.map((m, i) => (
@@ -199,7 +255,6 @@ export default function AdminPage() {
             </div>
           </motion.div>
 
-          {/* Chart */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="panel">
             <div className="g-label" style={{ marginBottom: 14 }}>Leads per Team Member</div>
             <ResponsiveContainer width="100%" height={180}>
@@ -218,27 +273,44 @@ export default function AdminPage() {
         {/* Right */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* Real Activity Feed from Audit Log */}
-          <motion.div initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }} className="panel" style={{ flex: 1 }}>
-            <div className="g-label" style={{ marginBottom: 14 }}>Activity Log</div>
-            {audit.length === 0 ? (
-              <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No activity recorded yet.</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {audit.map((entry, i) => (
-                  <motion.div key={entry.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 + 0.3 }}
-                    style={{ padding: "11px 0", borderBottom: i < audit.length - 1 ? "1px solid rgba(201,162,75,0.06)" : "none", display: "flex", gap: 11, alignItems: "flex-start" }}>
-                    <div style={{ width: 26, height: 26, borderRadius: 7, background: "var(--glass-2)", border: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {actionIcon(entry.action)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, color: "var(--text-1)", fontWeight: 500, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.detail}</div>
-                      <div style={{ fontSize: 10, color: "var(--text-3)" }}>{entry.actor_name} · {relativeTime(entry.ts)}</div>
-                    </div>
-                  </motion.div>
-                ))}
+          {/* XP Leaderboard */}
+          <motion.div initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }}
+            className="panel" style={{ flex: 1, padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "16px 18px 12px", borderBottom: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Trophy size={13} color="#C9A24B" strokeWidth={1.6} />
+                <div className="g-label">XP Leaderboard</div>
+              </div>
+              <button className="btn-gold" onClick={() => router.push("/missions")} style={{ fontSize: 9, padding: "5px 10px" }}>Go to Missions</button>
+            </div>
+            {lbMeta.resetMessage && (
+              <div style={{ padding: "7px 18px", background: "rgba(167,139,250,0.08)", borderBottom: "1px solid rgba(167,139,250,0.18)", fontSize: 11, color: "#A78BFA", fontWeight: 600 }}>
+                {lbMeta.resetMessage}
               </div>
             )}
+            <div style={{ maxHeight: 340, overflowY: "auto" }}>
+              {leaderboard.map((m, i) => {
+                const rank = i + 1
+                const isMe = m.id === currentUserId
+                const rankLabel = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`
+                return (
+                  <motion.div key={m.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                    style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 18px", borderBottom: "1px solid rgba(201,162,75,0.05)", background: isMe ? "rgba(201,162,75,0.07)" : "transparent" }}>
+                    <div style={{ width: 22, fontSize: rank <= 3 ? 14 : 10, fontWeight: 800, color: "var(--text-3)", textAlign: "center", flexShrink: 0 }}>{rankLabel}</div>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: `${m.color}18`, border: `1px solid ${isMe ? m.color : m.color + "30"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: m.color, flexShrink: 0 }}>{m.initials}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: isMe ? 700 : 600, color: isMe ? "var(--text-brand)" : "var(--text-1)", marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {m.name}{isMe ? " (you)" : ""}
+                      </div>
+                      <div className="g-bar-bg">
+                        <motion.div className="g-bar-fill" initial={{ width: 0 }} animate={{ width: `${m.xp > 0 ? (m.xp / Math.max(leaderboard[0]?.xp ?? 1, 1)) * 100 : 0}%` }} transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1], delay: i * 0.03 }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: m.xp > 0 ? "#C9A24B" : "var(--text-3)", flexShrink: 0, fontVariantNumeric: "tabular-nums", minWidth: 42, textAlign: "right" }}>{m.xp} XP</div>
+                  </motion.div>
+                )
+              })}
+            </div>
           </motion.div>
 
           {/* Alerts */}
@@ -258,6 +330,152 @@ export default function AdminPage() {
           </motion.div>
         </div>
       </div>
+
+      {/* Activity Log */}
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+        className="panel" style={{ marginTop: 18, padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px 12px", borderBottom: "1px solid var(--brand-edge)" }}>
+          <div className="g-label">Activity Log</div>
+        </div>
+        {audit.length === 0 ? (
+          <div style={{ padding: "24px", textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No activity recorded yet.</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))" }}>
+            {audit.map((entry, i) => (
+              <motion.div key={entry.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 + 0.4 }}
+                style={{ padding: "12px 22px", borderBottom: "1px solid rgba(201,162,75,0.05)", borderRight: "1px solid rgba(201,162,75,0.05)", display: "flex", gap: 11, alignItems: "flex-start" }}>
+                <div style={{ width: 26, height: 26, borderRadius: 7, background: "var(--glass-2)", border: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {actionIcon(entry.action)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-1)", fontWeight: 500, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.detail}</div>
+                  <div style={{ fontSize: 10, color: "var(--text-3)" }}>{entry.actor_name} · {relativeTime(entry.ts)}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* ── Intake Queue ───────────────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+        className="panel" style={{ marginTop: 18, padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "14px 22px 10px", borderBottom: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Inbox size={14} color="#60A5FA" strokeWidth={1.6} />
+            <div className="g-label">Intake Queue</div>
+            {intakePending > 0 && (
+              <span style={{ background: "#60A5FA18", color: "#60A5FA", border: "1px solid #60A5FA30", borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
+                {intakePending} new
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {(["all", "new", "working", "dead", "graduated"] as const).map(f => (
+              <button key={f} onClick={() => setIntakeFilter(f)}
+                style={{ fontSize: 9, padding: "4px 10px", borderRadius: "var(--r-sm)", cursor: "pointer", border: `1px solid ${intakeFilter === f ? "var(--brand-edge)" : "transparent"}`, background: intakeFilter === f ? "rgba(201,162,75,0.1)" : "transparent", color: intakeFilter === f ? "#C9A24B" : "var(--text-3)", fontWeight: intakeFilter === f ? 700 : 500 }}>
+                {f === "all" ? `All (${intakeLeads.length})` : `${f[0].toUpperCase()}${f.slice(1)} (${intakeLeads.filter(l => l.status === f).length})`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredIntake.length === 0 ? (
+          <div style={{ padding: "28px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+            {intakeLeads.length === 0 ? "No leads submitted to intake yet." : `No ${intakeFilter} leads`}
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="g-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Lead</th>
+                  <th>Company</th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>Submitted By</th>
+                  <th>Date</th>
+                  <th style={{ minWidth: 200 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredIntake.map((lead, i) => {
+                  const isWorking = intakeWorking === lead.id
+                  const showGraduateConfirm = graduateConfirm === lead.id
+                  const showDeleteConfirm   = deleteConfirm === lead.id
+                  return (
+                    <motion.tr key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
+                      <td>
+                        <span className={`badge ${INTAKE_BADGE[lead.status]}`} style={{ fontSize: 9 }}>{lead.status}</span>
+                      </td>
+                      <td style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{lead.name}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-2)" }}>{lead.company || "—"}</td>
+                      <td>
+                        {lead.phone
+                          ? <button className="btn-ghost" style={{ fontSize: 10, padding: "3px 8px" }} onClick={() => window.open(`tel:${lead.phone}`)}><PhoneCall size={10} /> {lead.phone}</button>
+                          : <span style={{ color: "var(--text-3)", fontSize: 11 }}>—</span>}
+                      </td>
+                      <td>
+                        {lead.email
+                          ? <button className="btn-ghost" style={{ fontSize: 10, padding: "3px 8px" }} onClick={() => window.open(`mailto:${lead.email}`)}><Mail size={10} /> {lead.email}</button>
+                          : <span style={{ color: "var(--text-3)", fontSize: 11 }}>—</span>}
+                      </td>
+                      <td style={{ fontSize: 11, color: "var(--text-3)" }}>{lead.submitted_by_name}</td>
+                      <td style={{ fontSize: 11, color: "var(--text-3)" }}>{relativeTime(lead.created_at)}</td>
+                      <td>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                          {isWorking ? (
+                            <Loader size={12} color="var(--text-3)" style={{ animation: "spin 1s linear infinite" }} />
+                          ) : showGraduateConfirm ? (
+                            <>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", marginRight: 2 }}>Graduate?</span>
+                              <button className="btn-gold" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => handleGraduate(lead.id)}>Yes</button>
+                              <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => setGraduateConfirm(null)}>No</button>
+                            </>
+                          ) : showDeleteConfirm ? (
+                            <>
+                              <span style={{ fontSize: 10, color: "var(--danger)", marginRight: 2 }}>Delete?</span>
+                              <button className="btn-danger" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => handleIntakeDelete(lead.id)}>Yes</button>
+                              <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => setDeleteConfirm(null)}>No</button>
+                            </>
+                          ) : (
+                            <>
+                              {lead.status !== "graduated" && (
+                                <button className="btn-gold" style={{ fontSize: 9, padding: "3px 8px" }} onClick={() => { setGraduateConfirm(lead.id); setDeleteConfirm(null) }}>
+                                  <ArrowUpRight size={10} /> Graduate
+                                </button>
+                              )}
+                              {lead.status === "new" && (
+                                <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px", color: "#C9A24B" }} onClick={() => handleIntakeStatus(lead.id, "working")}>
+                                  Working
+                                </button>
+                              )}
+                              {lead.status === "working" && (
+                                <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px", color: "var(--danger)" }} onClick={() => handleIntakeStatus(lead.id, "dead")}>
+                                  Dead
+                                </button>
+                              )}
+                              {lead.status === "dead" && (
+                                <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 8px", color: "#60A5FA" }} onClick={() => handleIntakeStatus(lead.id, "new")}>
+                                  Reopen
+                                </button>
+                              )}
+                              <button className="btn-ghost" style={{ fontSize: 9, padding: "3px 6px", color: "var(--danger)" }} onClick={() => { setDeleteConfirm(lead.id); setGraduateConfirm(null) }}>
+                                <Trash2 size={10} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </motion.div>
 
       {/* Lock Confirm Modal */}
       <AnimatePresence>
@@ -283,6 +501,7 @@ export default function AdminPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   )
 }

@@ -239,6 +239,11 @@ export async function verifyMission(
   return rows[0] ? rowToClaim(rows[0] as Row) : null
 }
 
+export async function resetLeaderboard(): Promise<void> {
+  await ensureInit()
+  await db()`DELETE FROM garuda_mission_claims`
+}
+
 export async function rejectMission(
   missionId:    string,
   userId:       string,

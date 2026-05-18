@@ -687,13 +687,14 @@ function DetailPanel({
       (currentUser.role === "team" && lead.assigned_to === currentUser.id)
     : false
 
-  // superadmin can flag any lead; admin/team can only flag their own
+  // superadmin/admin can flag any lead; team can flag their own or unassigned
   const canFlag = currentUser
-    ? currentUser.role === "superadmin" || lead.assigned_to === currentUser.id
+    ? currentUser.role === "superadmin" || currentUser.role === "admin" ||
+      lead.assigned_to === currentUser.id || lead.assigned_to === null
     : false
-  // superadmin can unflag any; others can only remove their own flag
+  // superadmin/admin can unflag any; team can only remove their own flag
   const canUnflag = currentUser
-    ? currentUser.role === "superadmin" || lead.flagged_by === currentUser.id
+    ? currentUser.role === "superadmin" || currentUser.role === "admin" || lead.flagged_by === currentUser.id
     : false
 
   // admin/superadmin can edit contact details on any flagged lead
@@ -1085,6 +1086,7 @@ export default function LeadsPage() {
   const [importFlash,    setImportFlash]    = useState("")
   const [addingLead,     setAddingLead]     = useState(false)
   const [mailLead,       setMailLead]       = useState<Lead | null>(null)
+  const [flagTarget,     setFlagTarget]     = useState<Lead | null>(null)
   const [leadView,       setLeadView]       = useState<"new" | "old">("new")
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -1582,6 +1584,13 @@ export default function LeadsPage() {
                         <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }} onClick={() => setMailLead(lead)}>
                           <Mail size={11} />
                         </button>
+                        <button
+                          className="btn-ghost"
+                          title={lead.flag_type ? "Flagged" : "Flag issue"}
+                          style={{ padding: "4px 9px", fontSize: 10, color: lead.flag_type ? "#FB923C" : undefined }}
+                          onClick={() => setFlagTarget(lead)}>
+                          <Flag size={11} strokeWidth={lead.flag_type ? 2.5 : 1.5} />
+                        </button>
                         <button className="btn-ghost" style={{ padding: "4px 9px", fontSize: 10 }} onClick={() => setSelected(lead)}>
                           <ChevronRight size={11} />
                         </button>
@@ -1762,6 +1771,20 @@ export default function LeadsPage() {
             lead={mailLead}
             senderName={users.find(u => u.id === currentUser?.id)?.name ?? "Club Garuda Team"}
             onClose={() => setMailLead(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Quick Flag Modal */}
+      <AnimatePresence>
+        {flagTarget && (
+          <FlagModal
+            lead={flagTarget}
+            onClose={() => setFlagTarget(null)}
+            onFlagged={updated => {
+              handleLeadUpdate(updated)
+              setFlagTarget(null)
+            }}
           />
         )}
       </AnimatePresence>

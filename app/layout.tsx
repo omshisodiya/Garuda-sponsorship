@@ -355,19 +355,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 180, background: "radial-gradient(ellipse at top, var(--sidebar-top-glow) 0%, transparent 70%)", pointerEvents: "none" }} />
 
             {/* Brand */}
-            <div style={{ padding: expanded ? "22px 18px 18px" : "22px 12px 18px", display: "flex", alignItems: "center", gap: 11, borderBottom: "1px solid var(--sidebar-brand-border)", flexShrink: 0, position: "relative" }}>
-              <motion.div
-                whileHover={{ rotate: 4, scale: 1.08 }}
-                transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, overflow: "hidden", boxShadow: "0 0 16px rgba(201,162,75,0.25)" }}
-              >
-                <Image src="/garuda.png" alt="Garuda OS" width={36} height={36} style={{ width: 36, height: 36, objectFit: "cover" }} />
-              </motion.div>
-              <AnimatePresence>
-                {expanded && (
-                  <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.18 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#C9A24B", letterSpacing: "0.06em" }}>GARUDA OS</div>
-                    <div style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>Command Centre</div>
+            <div style={{ padding: expanded ? "16px 18px 14px" : "16px 12px 14px", display: "flex", alignItems: "center", borderBottom: "1px solid var(--sidebar-brand-border)", flexShrink: 0, position: "relative", minHeight: 72 }}>
+              <AnimatePresence mode="wait">
+                {expanded ? (
+                  <motion.div
+                    key="logo-expanded"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.18 }}
+                    whileHover={{ scale: 1.02 }}
+                    style={{ borderRadius: 12, background: "rgba(255,255,255,0.93)", padding: "6px 14px", boxShadow: "0 0 20px rgba(201,162,75,0.22)", cursor: "default" }}
+                  >
+                    <Image src="/garuda.png" alt="Garuda OS" width={148} height={40} style={{ width: 148, height: 40, objectFit: "contain", display: "block" }} />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="logo-collapsed"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    whileHover={{ rotate: 4, scale: 1.1 }}
+                    style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg, #6B0F1A, #C9A24B)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 18px rgba(201,162,75,0.35)", fontSize: 20, fontWeight: 900, color: "white", fontFamily: "serif", letterSpacing: "-0.02em", flexShrink: 0 }}
+                  >
+                    G
                   </motion.div>
                 )}
               </AnimatePresence>

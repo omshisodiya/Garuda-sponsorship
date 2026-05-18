@@ -59,6 +59,9 @@ export default function AssignPage() {
   const [distributing,    setDistributing]    = useState(false)
   const [unassignedOnly,  setUnassignedOnly]  = useState(false)
   const [intakePending,   setIntakePending]   = useState(0)
+  const [leadView,        setLeadView]        = useState<"new" | "old">("new")
+
+  const LEGACY_CUTOFF = "2026-05-18"
 
   useEffect(() => {
     Promise.all([
@@ -92,10 +95,11 @@ export default function AssignPage() {
   const filtered = useMemo(() =>
     leads.filter(l => {
       if (unassignedOnly && l.assigned_to !== null) return false
-      return [l.company, l.poc_name, l.category, l.status].join(" ")
+      const matchAge = leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF
+      return matchAge && [l.company, l.poc_name, l.category, l.status].join(" ")
         .toLowerCase().includes(search.toLowerCase())
     }),
-    [leads, search, unassignedOnly]
+    [leads, search, unassignedOnly, leadView, LEGACY_CUTOFF]
   )
 
   async function assign(leadId: string, memberId: string | "null") {
@@ -130,7 +134,7 @@ export default function AssignPage() {
   }
 
   async function autoDistribute() {
-    const unassigned = leads.filter(l => l.assigned_to === null && !["confirmed","rejected"].includes(l.status))
+    const unassigned = leads.filter(l => l.assigned_to === null && !["confirmed","rejected"].includes(l.status) && (leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF))
     if (unassigned.length === 0 || assignable.length === 0) return
     setDistributing(true)
 
@@ -191,11 +195,12 @@ export default function AssignPage() {
     else setSelected(new Set(filtered.map(l => l.id)))
   }
 
-  const teamStats = assignable.map(m => ({
+  const viewLeads  = leads.filter(l => leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF)
+  const teamStats  = assignable.map(m => ({
     ...m,
-    count: leads.filter(l => l.assigned_to === m.id).length,
+    count: viewLeads.filter(l => l.assigned_to === m.id).length,
   }))
-  const unassigned = leads.filter(l => l.assigned_to === null).length
+  const unassigned = viewLeads.filter(l => l.assigned_to === null).length
 
   if (loading) {
     return (
@@ -217,7 +222,7 @@ export default function AssignPage() {
           <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>Assignments · Lead Ownership</div>
           <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: 0 }}>Assignment Console</h1>
           <p style={{ color: "var(--text-3)", fontSize: 12, marginTop: 5 }}>
-            {leads.length} leads · {leads.length - unassigned} assigned · {unassigned} unassigned
+            {viewLeads.length} leads · {viewLeads.length - unassigned} assigned · {unassigned} unassigned
           </p>
           {intakePending > 0 && (
             <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "var(--r-sm)", fontSize: 11, color: "#60A5FA", fontWeight: 600 }}>
@@ -235,6 +240,25 @@ export default function AssignPage() {
           {distributing ? "Distributing…" : `Auto-Distribute (${unassigned})`}
         </button>
       </motion.div>
+
+      {/* New / Old toggle */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 18, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", width: "fit-content" }}>
+        {(["new", "old"] as const).map(v => {
+          const count = leads.filter(l => v === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF).length
+          return (
+            <button key={v} onClick={() => { setLeadView(v); setSelected(new Set()) }}
+              style={{ padding: "9px 20px", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 7,
+                background: leadView === v ? "rgba(201,162,75,0.12)" : "transparent",
+                color: leadView === v ? "#C9A24B" : "var(--text-3)",
+                borderRight: v === "new" ? "1px solid var(--brand-edge)" : "none" }}>
+              {v === "new" ? "New Leads" : "Old Leads"}
+              <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: leadView === v ? "rgba(201,162,75,0.2)" : "rgba(255,255,255,0.06)", color: leadView === v ? "#C9A24B" : "var(--text-3)", fontWeight: 800 }}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* Team Load — scrollable row */}
       <div style={{ overflowX: "auto", marginBottom: 18 }}>

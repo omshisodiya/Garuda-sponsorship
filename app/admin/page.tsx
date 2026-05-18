@@ -75,6 +75,13 @@ export default function AdminPage() {
   const [graduateConfirm, setGraduateConfirm] = useState<string | null>(null)
   const [deleteConfirm,   setDeleteConfirm]   = useState<string | null>(null)
   const [intakeWorking,   setIntakeWorking]   = useState<string | null>(null)
+  const [leadView,        setLeadView]        = useState<"new" | "old">("new")
+
+  const LEGACY_CUTOFF = "2026-05-18"
+
+  const viewLeads = useMemo(() =>
+    leads.filter(l => leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF)
+  , [leads, leadView, LEGACY_CUTOFF])
 
   useEffect(() => {
     async function load() {
@@ -101,27 +108,27 @@ export default function AdminPage() {
   }, [])
 
   const stats = useMemo(() => {
-    const confirmed = leads.filter(l => l.status === "confirmed")
+    const confirmed = viewLeads.filter(l => l.status === "confirmed")
     return {
-      total:     leads.length,
-      assigned:  leads.filter(l => l.assigned_to !== null).length,
+      total:     viewLeads.length,
+      assigned:  viewLeads.filter(l => l.assigned_to !== null).length,
       confirmed: confirmed.length,
       secured:   confirmed.reduce((s, l) => s + l.deal_value, 0),
     }
-  }, [leads])
+  }, [viewLeads])
 
   const adminTeam = TEAM.filter(m => m.tier !== "superadmin")
 
   const team = useMemo(() =>
     adminTeam.map(member => {
-      const myLeads   = leads.filter(l => l.assigned_to === member.id)
+      const myLeads   = viewLeads.filter(l => l.assigned_to === member.id)
       const confirmed = myLeads.filter(l => l.status === "confirmed")
       return { ...member, totalLeads: myLeads.length, confirmed: confirmed.length, secured: confirmed.reduce((s, l) => s + l.deal_value, 0) }
-    }), [leads, adminTeam]
+    }), [viewLeads, adminTeam]
   )
 
   const chartData = adminTeam.map(m => {
-    const mine = leads.filter(l => l.assigned_to === m.id)
+    const mine = viewLeads.filter(l => l.assigned_to === m.id)
     return { name: m.name.split(" ")[0], leads: mine.length, confirmed: mine.filter(l => l.status === "confirmed").length }
   })
 
@@ -195,6 +202,25 @@ export default function AdminPage() {
           </button>
         </div>
       </motion.div>
+
+      {/* New / Old toggle */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 16, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", width: "fit-content" }}>
+        {(["new", "old"] as const).map(v => {
+          const count = leads.filter(l => v === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF).length
+          return (
+            <button key={v} onClick={() => setLeadView(v)}
+              style={{ padding: "9px 20px", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 7,
+                background: leadView === v ? "rgba(201,162,75,0.12)" : "transparent",
+                color: leadView === v ? "#C9A24B" : "var(--text-3)",
+                borderRight: v === "new" ? "1px solid var(--brand-edge)" : "none" }}>
+              {v === "new" ? "New Leads" : "Old Leads"}
+              <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: leadView === v ? "rgba(201,162,75,0.2)" : "rgba(255,255,255,0.06)", color: leadView === v ? "#C9A24B" : "var(--text-3)", fontWeight: 800 }}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>

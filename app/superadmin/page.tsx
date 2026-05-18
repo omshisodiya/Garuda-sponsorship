@@ -651,8 +651,15 @@ export default function SuperAdminDashboard() {
   const [graduateConfirm,  setGraduateConfirm]  = useState<string | null>(null)
   const [deleteConfirm,    setDeleteConfirm]    = useState<string | null>(null)
   const [intakeWorking,    setIntakeWorking]     = useState<string | null>(null)
+  const [leadView,         setLeadView]         = useState<"new" | "old">("new")
 
-  const stats = useMemo(() => computeStats(leads), [leads])
+  const LEGACY_CUTOFF = "2026-05-18"
+
+  const viewLeads = useMemo(() =>
+    leads.filter(l => leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF)
+  , [leads, leadView, LEGACY_CUTOFF])
+
+  const stats = useMemo(() => computeStats(viewLeads), [viewLeads])
 
   /* Monthly revenue computed from live leads (Jan → current month) */
   const monthlyData = useMemo(() => {
@@ -662,18 +669,18 @@ export default function SuperAdminDashboard() {
     const mo  = now.getMonth()
     return MONTHS.slice(0, mo + 1).map((month, idx) => ({
       month,
-      secured:  leads
+      secured:  viewLeads
         .filter(l => l.status === "confirmed"
           && new Date(l.last_activity).getFullYear() === yr
           && new Date(l.last_activity).getMonth()    === idx)
         .reduce((s, l) => s + l.deal_value, 0),
-      pipeline: Math.round(leads
+      pipeline: Math.round(viewLeads
         .filter(l => !["confirmed","rejected"].includes(l.status)
           && new Date(l.created_at).getFullYear() === yr
           && new Date(l.created_at).getMonth()    === idx)
         .reduce((s, l) => s + l.deal_value * l.probability / 100, 0)),
     }))
-  }, [leads])
+  }, [viewLeads])
 
   /* Alerts computed from live lead state */
   type ComputedAlert = { id: string; severity: "critical"|"warning"|"info"; title: string; desc: string; ack: boolean; time: string }
@@ -683,7 +690,7 @@ export default function SuperAdminDashboard() {
     const out: ComputedAlert[] = []
 
     // High-value leads never contacted
-    leads
+    viewLeads
       .filter(l => l.status === "not_started" && l.deal_value >= MIN_SPONSORSHIP_AMOUNT)
       .sort((a, b) => b.deal_value - a.deal_value)
       .slice(0, 2)
@@ -695,7 +702,7 @@ export default function SuperAdminDashboard() {
       }))
 
     // Stalled leads (no activity ≥7 days)
-    leads
+    viewLeads
       .filter(l => !["confirmed","rejected"].includes(l.status) && new Date(l.last_activity) < sevenAgo)
       .sort((a, b) => new Date(a.last_activity).getTime() - new Date(b.last_activity).getTime())
       .slice(0, 2)
@@ -710,7 +717,7 @@ export default function SuperAdminDashboard() {
       })
 
     // Milestone: confirmed sponsors
-    const confirmed = leads.filter(l => l.status === "confirmed")
+    const confirmed = viewLeads.filter(l => l.status === "confirmed")
     if (confirmed.length > 0) {
       const secured = confirmed.reduce((s, l) => s + l.deal_value, 0)
       out.push({
@@ -722,7 +729,7 @@ export default function SuperAdminDashboard() {
     }
 
     return out.slice(0, 5)
-  }, [leads])
+  }, [viewLeads])
 
   /* Signals computed from live lead state */
   type ComputedSignal = { id: string; type: "opportunity"|"risk"|"action"; company: string; title: string; desc: string; score: number; time: string }
@@ -730,7 +737,7 @@ export default function SuperAdminDashboard() {
     const out: ComputedSignal[] = []
 
     // Hot leads (probability ≥70, not closed)
-    leads
+    viewLeads
       .filter(l => l.probability >= 70 && !["confirmed","rejected"].includes(l.status))
       .sort((a, b) => b.probability - a.probability)
       .slice(0, 2)
@@ -742,7 +749,7 @@ export default function SuperAdminDashboard() {
       }))
 
     // At-risk negotiations
-    leads
+    viewLeads
       .filter(l => l.stage === "negotiation" && l.probability < 60 && !["confirmed","rejected"].includes(l.status))
       .slice(0, 1)
       .forEach(l => out.push({
@@ -753,7 +760,7 @@ export default function SuperAdminDashboard() {
       }))
 
     // Ready to advance (contacted, ≥50% probability)
-    leads
+    viewLeads
       .filter(l => ["contacted","followed_up"].includes(l.status) && l.probability >= 50)
       .slice(0, 1)
       .forEach(l => out.push({
@@ -764,7 +771,7 @@ export default function SuperAdminDashboard() {
       }))
 
     return out.slice(0, 3)
-  }, [leads])
+  }, [viewLeads])
 
   async function handleToggleShutdown(enabled: boolean) {
     setShuttingDown(true)
@@ -997,7 +1004,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.unassigned === 0,
       accentColor: "#60A5FA",
       icon: <Database size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "All Leads", leads }),
+      onDrill: () => setDrill({ label: "All Leads", leads: viewLeads }),
     },
     {
       label: "Assigned Leads",
@@ -1006,7 +1013,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.assigned > 0,
       accentColor: "#C9A24B",
       icon: <GitBranch size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Assigned Leads", leads: leads.filter(l => l.assigned_to !== null) }),
+      onDrill: () => setDrill({ label: "Assigned Leads", leads: viewLeads.filter(l => l.assigned_to !== null) }),
     },
     {
       label: "Contacted",
@@ -1015,7 +1022,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.contacted > 0,
       accentColor: "#A78BFA",
       icon: <PhoneCall size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Contacted Leads", leads: leads.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status)) }),
+      onDrill: () => setDrill({ label: "Contacted Leads", leads: viewLeads.filter(l => ["contacted","followed_up","in_discussion","confirmed"].includes(l.status)) }),
     },
     {
       label: "In Discussion",
@@ -1024,7 +1031,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.inDiscussion > 0,
       accentColor: "#F59E0B",
       icon: <MessageSquare size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "In Discussion", leads: leads.filter(l => l.status === "in_discussion") }),
+      onDrill: () => setDrill({ label: "In Discussion", leads: viewLeads.filter(l => l.status === "in_discussion") }),
     },
     {
       label: "Confirmed Sponsors",
@@ -1033,7 +1040,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.confirmed > 0,
       accentColor: "#4ADE80",
       icon: <CheckCircle size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Confirmed Sponsors", leads: leads.filter(l => l.status === "confirmed") }),
+      onDrill: () => setDrill({ label: "Confirmed Sponsors", leads: viewLeads.filter(l => l.status === "confirmed") }),
     },
     {
       label: "Revenue Secured",
@@ -1043,7 +1050,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.progressPct > 0,
       accentColor: "#C9A24B",
       icon: <IndianRupee size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Confirmed Sponsors", leads: leads.filter(l => l.status === "confirmed") }),
+      onDrill: () => setDrill({ label: "Confirmed Sponsors", leads: viewLeads.filter(l => l.status === "confirmed") }),
     },
     {
       label: "Pipeline Value",
@@ -1053,7 +1060,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.pipeline > 0,
       accentColor: "#60A5FA",
       icon: <TrendingUp size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Pipeline Leads", leads: leads.filter(l => !["confirmed","rejected"].includes(l.status)) }),
+      onDrill: () => setDrill({ label: "Pipeline Leads", leads: viewLeads.filter(l => !["confirmed","rejected"].includes(l.status)) }),
     },
     {
       label: "Target Progress",
@@ -1071,7 +1078,7 @@ export default function SuperAdminDashboard() {
       trendUp: stats.followUpsDue === 0,
       accentColor: "#F59E0B",
       icon: <Clock size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Follow-ups Overdue", leads: leads.filter(l => !["confirmed","rejected"].includes(l.status) && new Date(l.last_activity) < threeDaysAgo) }),
+      onDrill: () => setDrill({ label: "Follow-ups Overdue", leads: viewLeads.filter(l => !["confirmed","rejected"].includes(l.status) && new Date(l.last_activity) < threeDaysAgo) }),
     },
     {
       label: "Conversion Rate",
@@ -1081,14 +1088,14 @@ export default function SuperAdminDashboard() {
       trendUp: stats.conversionRate > 0,
       accentColor: "#4ADE80",
       icon: <BarChart3 size={18} strokeWidth={1.5} />,
-      onDrill: () => setDrill({ label: "Qualified Leads", leads: leads.filter(l => ["qualified","proposal","negotiation","won"].includes(l.stage)) }),
+      onDrill: () => setDrill({ label: "Qualified Leads", leads: viewLeads.filter(l => ["qualified","proposal","negotiation","won"].includes(l.stage)) }),
     },
   ]
 
   /* Category dist computed from fetched leads */
   const categoryWithColor = useMemo(() => {
     const cats = new Map<string, { count: number; revenue: number }>()
-    for (const l of leads) {
+    for (const l of viewLeads) {
       const cur = cats.get(l.category) ?? { count: 0, revenue: 0 }
       cats.set(l.category, { count: cur.count + 1, revenue: cur.revenue + l.deal_value })
     }
@@ -1096,17 +1103,17 @@ export default function SuperAdminDashboard() {
       name, value: v.count, revenue: v.revenue,
       fill: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
     }))
-  }, [leads])
+  }, [viewLeads])
 
   /* Stage dist computed from fetched leads */
   const stageDist = useMemo(() => [
-    { stage: "Prospect",    count: leads.filter(l => l.stage === "prospect").length,    fill: "#6E695F" },
-    { stage: "Qualified",   count: leads.filter(l => l.stage === "qualified").length,   fill: "#60A5FA" },
-    { stage: "Proposal",    count: leads.filter(l => l.stage === "proposal").length,    fill: "#A78BFA" },
-    { stage: "Negotiation", count: leads.filter(l => l.stage === "negotiation").length, fill: "#F59E0B" },
-    { stage: "Won",         count: leads.filter(l => l.stage === "won").length,         fill: "#4ADE80" },
-    { stage: "Lost",        count: leads.filter(l => l.stage === "lost").length,        fill: "#F43F5E" },
-  ], [leads])
+    { stage: "Prospect",    count: viewLeads.filter(l => l.stage === "prospect").length,    fill: "#6E695F" },
+    { stage: "Qualified",   count: viewLeads.filter(l => l.stage === "qualified").length,   fill: "#60A5FA" },
+    { stage: "Proposal",    count: viewLeads.filter(l => l.stage === "proposal").length,    fill: "#A78BFA" },
+    { stage: "Negotiation", count: viewLeads.filter(l => l.stage === "negotiation").length, fill: "#F59E0B" },
+    { stage: "Won",         count: viewLeads.filter(l => l.stage === "won").length,         fill: "#4ADE80" },
+    { stage: "Lost",        count: viewLeads.filter(l => l.stage === "lost").length,        fill: "#F43F5E" },
+  ], [viewLeads])
 
   /* target bar */
   const securedPct = Math.min(stats.progressPct, 100)
@@ -1243,6 +1250,25 @@ export default function SuperAdminDashboard() {
           </button>
         </div>
       </motion.div>
+
+      {/* ── NEW / OLD TOGGLE ── */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 20, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", width: "fit-content" }}>
+        {(["new", "old"] as const).map(v => {
+          const count = leads.filter(l => v === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF).length
+          return (
+            <button key={v} onClick={() => setLeadView(v)}
+              style={{ padding: "9px 22px", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 7,
+                background: leadView === v ? "rgba(201,162,75,0.12)" : "transparent",
+                color: leadView === v ? "#C9A24B" : "var(--text-3)",
+                borderRight: v === "new" ? "1px solid var(--brand-edge)" : "none" }}>
+              {v === "new" ? "New Leads" : "Old Leads"}
+              <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: leadView === v ? "rgba(201,162,75,0.2)" : "rgba(255,255,255,0.06)", color: leadView === v ? "#C9A24B" : "var(--text-3)", fontWeight: 800 }}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* ── KPI GRID ── */}
       <div

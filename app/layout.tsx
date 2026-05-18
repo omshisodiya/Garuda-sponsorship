@@ -365,9 +365,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.18 }}
                     whileHover={{ scale: 1.02 }}
-                    style={{ borderRadius: 12, background: "rgba(255,255,255,0.93)", padding: "6px 14px", boxShadow: "0 0 20px rgba(201,162,75,0.22)", cursor: "default" }}
+                    style={{ flexShrink: 0, cursor: "default" }}
                   >
-                    <Image src="/garuda.png" alt="Garuda OS" width={148} height={40} style={{ width: 148, height: 40, objectFit: "contain", display: "block" }} />
+                    <Image src="/garuda.png" alt="Garuda OS" width={160} height={44} style={{ width: 160, height: 44, objectFit: "contain", display: "block", filter: theme === "dark" ? "invert(1) hue-rotate(180deg)" : "none", opacity: theme === "dark" ? 0.92 : 1 }} />
                   </motion.div>
                 ) : (
                   <motion.div

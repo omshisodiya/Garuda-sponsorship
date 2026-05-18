@@ -155,3 +155,19 @@ export async function deleteIntakeLead(id: string): Promise<boolean> {
   const rows = await db()`DELETE FROM garuda_intake WHERE id = ${id} RETURNING id`
   return rows.length > 0
 }
+
+// XP per submission: 10 for any live lead, 25 for graduated
+export async function getIntakeXpByUser(): Promise<Record<string, number>> {
+  await ensureInit()
+  const rows = await db()`
+    SELECT submitted_by, status FROM garuda_intake
+    WHERE status IN ('new','working','dead','graduated')
+  `
+  const out: Record<string, number> = {}
+  for (const r of rows) {
+    const uid = String(r.submitted_by)
+    const pts = r.status === "graduated" ? 25 : 10
+    out[uid] = (out[uid] ?? 0) + pts
+  }
+  return out
+}

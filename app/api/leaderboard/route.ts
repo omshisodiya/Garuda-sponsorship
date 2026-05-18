@@ -3,6 +3,7 @@ import { getSessionFromCookies } from "@/app/lib/server/auth"
 import { getAllLeads } from "@/app/lib/server/leadStore"
 import { getAllUsersXP } from "@/app/lib/server/missionStore"
 import { getLeaderboardReset, getXpPenalty, getAllUsers } from "@/app/lib/server/store"
+import { getIntakeXpByUser } from "@/app/lib/server/intakeStore"
 import { TEAM } from "@/app/lib/data"
 import type { Lead } from "@/app/lib/data"
 
@@ -39,8 +40,8 @@ export async function GET() {
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
 
-  const [leads, dbUsers, xpMap, resetData, penaltyPct] = await Promise.all([
-    getAllLeads(), getAllUsers(), getAllUsersXP(), getLeaderboardReset(), getXpPenalty(),
+  const [leads, dbUsers, xpMap, resetData, penaltyPct, intakeXpMap] = await Promise.all([
+    getAllLeads(), getAllUsers(), getAllUsersXP(), getLeaderboardReset(), getXpPenalty(), getIntakeXpByUser(),
   ])
 
   // Name→TEAM entry lookup for color/initials override
@@ -54,7 +55,7 @@ export async function GET() {
       const nameLower  = u.name.toLowerCase().trim()
       const teamMember = teamByName.get(nameLower)
       const mLeads     = leads.filter(l => l.assigned_to === u.id)
-      const leadXp     = mLeads.reduce((s, l) => s + xpForLead(l), 0)
+      const leadXp     = mLeads.reduce((s, l) => s + xpForLead(l), 0) + (intakeXpMap[u.id] ?? 0)
       const missionXp  = xpMap[u.id] ?? 0
       const xp         = Math.floor((leadXp + missionXp) * multiplier)
       return {

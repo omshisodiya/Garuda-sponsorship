@@ -87,6 +87,7 @@ export default function TeamPage() {
   const [submitResult, setSubmitResult] = useState("")
   const [myIntake,     setMyIntake]     = useState<IntakeLead[]>([])
   const [iFilter,      setIFilter]      = useState<"all" | "new" | "working" | "dead" | "graduated">("all")
+  const [intakeTarget, setIntakeTarget] = useState(0)
 
   useEffect(() => {
     if (teamLocked) router.push("/locked")
@@ -95,16 +96,19 @@ export default function TeamPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [meRes, leadsRes, lbRes, intakeRes] = await Promise.all([
+        const [meRes, leadsRes, lbRes, intakeRes, targetsRes] = await Promise.all([
           fetch("/api/auth/me"),
           fetch("/api/leads"),
           fetch("/api/leaderboard"),
           fetch("/api/intake"),
+          fetch("/api/intake/targets"),
         ])
+        let uid: string | null = null
         if (meRes.ok) {
           const { user } = await meRes.json()
           setUserName(user?.name ?? "Team Member")
           setUserId(user?.id ?? null)
+          uid = user?.id ?? null
         }
         if (leadsRes.ok) setMyLeads((await leadsRes.json()).leads ?? [])
         if (lbRes.ok) {
@@ -113,6 +117,10 @@ export default function TeamPage() {
           setLbMeta({ resetMessage: d.resetMessage ?? "", resetAt: d.resetAt ?? null })
         }
         if (intakeRes.ok) setMyIntake((await intakeRes.json()).leads ?? [])
+        if (targetsRes.ok && uid) {
+          const { targets } = await targetsRes.json()
+          setIntakeTarget(targets?.[uid] ?? 0)
+        }
       } catch { /* silent */ } finally { setLoading(false) }
     }
     load()
@@ -253,6 +261,51 @@ export default function TeamPage() {
           </button>
         </div>
       </motion.div>
+
+      {/* Intake target banner — shown only when a target has been set */}
+      {intakeTarget > 0 && (() => {
+        const submitted = myIntake.length
+        const pct = Math.min(100, Math.round(submitted / intakeTarget * 100))
+        const done = submitted >= intakeTarget
+        return (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            style={{ marginBottom: 18, padding: "14px 20px", borderRadius: "var(--r-lg)", border: `1px solid ${done ? "rgba(74,222,128,0.35)" : "rgba(201,162,75,0.35)"}`, background: done ? "rgba(74,222,128,0.06)" : "rgba(201,162,75,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Inbox size={15} color={done ? "#4ADE80" : "#C9A24B"} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)" }}>
+                    Lead Submission Target
+                    {done && <span style={{ marginLeft: 8, fontSize: 10, color: "#4ADE80", fontWeight: 700 }}>✓ Complete!</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>
+                    {done
+                      ? `You've hit your target of ${intakeTarget} leads`
+                      : `${intakeTarget - submitted} more lead${intakeTarget - submitted !== 1 ? "s" : ""} to reach your target`}
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <span style={{ fontSize: 22, fontWeight: 900, color: done ? "#4ADE80" : "#C9A24B", fontVariantNumeric: "tabular-nums" }}>{submitted}</span>
+                <span style={{ fontSize: 13, color: "var(--text-3)", fontWeight: 500 }}>/{intakeTarget}</span>
+              </div>
+            </div>
+            <div style={{ height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 100, overflow: "hidden" }}>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.8, ease: [0.4,0,0.2,1] }}
+                style={{ height: "100%", borderRadius: 100, background: done ? "linear-gradient(90deg,#4ADE80,#22D3EE)" : "linear-gradient(90deg,#C9A24B,#F472B6)" }}
+              />
+            </div>
+            {!done && (
+              <div style={{ marginTop: 6, fontSize: 10, color: "var(--text-3)" }}>
+                {pct}% complete · click <strong style={{ color: "#C9A24B" }}>Add Lead</strong> above to submit new leads
+              </div>
+            )}
+          </motion.div>
+        )
+      })()}
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>

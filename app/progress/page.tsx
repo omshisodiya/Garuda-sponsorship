@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState, useMemo, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Inbox, Target, TrendingUp, CheckCircle, XCircle, Clock, Users, ArrowUpDown, Pencil, Check, X as XIcon, Shuffle } from "lucide-react"
+import { Inbox, Target, TrendingUp, CheckCircle, XCircle, Clock, Users, ArrowUpDown, Pencil, Check, X as XIcon, Shuffle, Plus } from "lucide-react"
 
 type UserProgress = {
   id: string
@@ -71,6 +72,7 @@ function ProgressRing({ value, max, color, size = 56 }: { value: number; max: nu
 }
 
 export default function ProgressPage() {
+  const router = useRouter()
   const [stats,      setStats]      = useState<UserProgress[]>([])
   const [loading,    setLoading]    = useState(true)
   const [role,       setRole]       = useState<string>(() =>
@@ -301,6 +303,66 @@ export default function ProgressPage() {
         <SortBtn k="leadsConfirmed"  label="Confirmed" />
         <SortBtn k="name"            label="Name" />
       </div>
+
+      {/* Team member — intake target banner + CTA */}
+      {!isLeader && displayed.length > 0 && (() => {
+        const me = displayed[0]
+        const pct = me.intakeTarget > 0 ? Math.min(100, Math.round(me.intakeTotal / me.intakeTarget * 100)) : 0
+        const done = me.intakeTarget > 0 && me.intakeTotal >= me.intakeTarget
+        return (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            style={{ marginBottom: 18, padding: "14px 20px", borderRadius: "var(--r-lg)", border: `1px solid ${done ? "rgba(74,222,128,0.35)" : "rgba(201,162,75,0.35)"}`, background: done ? "rgba(74,222,128,0.06)" : "rgba(201,162,75,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: me.intakeTarget > 0 ? 10 : 0, flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Inbox size={15} color={done ? "#4ADE80" : "#C9A24B"} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)" }}>
+                    {me.intakeTarget > 0 ? "Your Lead Submission Target" : "Lead Submission"}
+                    {done && <span style={{ marginLeft: 8, fontSize: 10, color: "#4ADE80", fontWeight: 700 }}>✓ Complete!</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>
+                    {me.intakeTarget > 0
+                      ? done
+                        ? `You've hit your target of ${me.intakeTarget} leads`
+                        : `${me.intakeTarget - me.intakeTotal} more lead${me.intakeTarget - me.intakeTotal !== 1 ? "s" : ""} to reach your target of ${me.intakeTarget}`
+                      : `${me.intakeTotal} lead${me.intakeTotal !== 1 ? "s" : ""} submitted so far`}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {me.intakeTarget > 0 && (
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{ fontSize: 22, fontWeight: 900, color: done ? "#4ADE80" : "#C9A24B", fontVariantNumeric: "tabular-nums" }}>{me.intakeTotal}</span>
+                    <span style={{ fontSize: 13, color: "var(--text-3)", fontWeight: 500 }}>/{me.intakeTarget}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => router.push("/team")}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: "var(--r-md)", border: `1px solid ${done ? "rgba(74,222,128,0.4)" : "rgba(201,162,75,0.4)"}`, background: done ? "rgba(74,222,128,0.1)" : "rgba(201,162,75,0.1)", color: done ? "#4ADE80" : "#C9A24B", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  <Plus size={12} /> Add Lead
+                </button>
+              </div>
+            </div>
+            {me.intakeTarget > 0 && (
+              <>
+                <div style={{ height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 100, overflow: "hidden" }}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.8, ease: [0.4,0,0.2,1] }}
+                    style={{ height: "100%", borderRadius: 100, background: done ? "linear-gradient(90deg,#4ADE80,#22D3EE)" : "linear-gradient(90deg,#C9A24B,#F472B6)" }}
+                  />
+                </div>
+                {!done && (
+                  <div style={{ marginTop: 6, fontSize: 10, color: "var(--text-3)" }}>
+                    {pct}% complete · click <strong style={{ color: "#C9A24B" }}>Add Lead</strong> to submit on your dashboard
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )
+      })()}
 
       {/* Cards grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px,1fr))", gap: 14 }}>

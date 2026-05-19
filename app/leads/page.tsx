@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useMemo, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Search, Upload, Plus, X, Mail, Phone, ChevronRight,
   LayoutGrid, List, SlidersHorizontal, Download, Loader, Camera, Save, Check, Copy,
-  Flag, AlertTriangle, CheckCircle2, Sparkles,
+  Flag, AlertTriangle, CheckCircle2, Sparkles, Inbox,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
@@ -1067,9 +1068,12 @@ function DetailPanel({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function LeadsPage() {
+  const router = useRouter()
   const [leads,          setLeads]          = useState<Lead[]>([])
   const [users,          setUsers]          = useState<DisplayUser[]>([])
   const [currentUser,    setCurrentUser]    = useState<{ id: string; role: string } | null>(null)
+  const [intakeTarget,   setIntakeTarget]   = useState(0)
+  const [myIntakeCount,  setMyIntakeCount]  = useState(0)
   const [loading,        setLoading]        = useState(true)
   const [search,         setSearch]         = useState("")
   const [statusFilter,   setStatusFilter]   = useState<LeadStatus | "all">("all")
@@ -1118,10 +1122,19 @@ export default function LeadsPage() {
       fetch("/api/leads").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/users").then(r => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/auth/me").then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([leadsData, usersData, meData]) => {
+      fetch("/api/intake").then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/intake/targets").then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([leadsData, usersData, meData, intakeData, targetsData]) => {
       if (leadsData) setLeads(leadsData.leads ?? [])
       if (usersData) setUsers((usersData.users ?? []).map(toDisplayUser))
-      if (meData?.user) setCurrentUser({ id: meData.user.id, role: meData.user.role })
+      if (meData?.user) {
+        const u = meData.user
+        setCurrentUser({ id: u.id, role: u.role })
+        if (u.role !== "superadmin") {
+          setMyIntakeCount((intakeData?.leads ?? []).filter((l: { submitted_by: string }) => l.submitted_by === u.id).length)
+          setIntakeTarget(targetsData?.targets?.[u.id] ?? 0)
+        }
+      }
     }).finally(() => setLoading(false))
   }, [])
 
@@ -1376,6 +1389,48 @@ export default function LeadsPage() {
           <button className="btn-gold" onClick={() => setShowAddForm(true)} style={{ fontSize: 11 }}><Plus size={13} /> Add Lead</button>
         </div>
       </motion.div>
+
+      {/* Intake target banner — own submission progress (non-superadmin) */}
+      {intakeTarget > 0 && currentUser?.role !== "superadmin" && (() => {
+        const pct  = Math.min(100, Math.round(myIntakeCount / intakeTarget * 100))
+        const done = myIntakeCount >= intakeTarget
+        return (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            style={{ marginBottom: 14, padding: "14px 20px", borderRadius: "var(--r-lg)", border: `1px solid ${done ? "rgba(74,222,128,0.35)" : "rgba(201,162,75,0.35)"}`, background: done ? "rgba(74,222,128,0.06)" : "rgba(201,162,75,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Inbox size={15} color={done ? "#4ADE80" : "#C9A24B"} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)" }}>
+                    Your Lead Submission Target
+                    {done && <span style={{ marginLeft: 8, fontSize: 10, color: "#4ADE80", fontWeight: 700 }}>✓ Complete!</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>
+                    {done
+                      ? `You've hit your target of ${intakeTarget} leads`
+                      : `${intakeTarget - myIntakeCount} more lead${intakeTarget - myIntakeCount !== 1 ? "s" : ""} to reach your target of ${intakeTarget}`}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: 22, fontWeight: 900, color: done ? "#4ADE80" : "#C9A24B", fontVariantNumeric: "tabular-nums" }}>{myIntakeCount}</span>
+                  <span style={{ fontSize: 13, color: "var(--text-3)", fontWeight: 500 }}>/{intakeTarget}</span>
+                </div>
+                <button onClick={() => router.push("/team")}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: "var(--r-md)", border: `1px solid ${done ? "rgba(74,222,128,0.4)" : "rgba(201,162,75,0.4)"}`, background: done ? "rgba(74,222,128,0.1)" : "rgba(201,162,75,0.1)", color: done ? "#4ADE80" : "#C9A24B", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  <Plus size={12} /> Add to Intake
+                </button>
+              </div>
+            </div>
+            <div style={{ height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 100, overflow: "hidden" }}>
+              <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: [0.4,0,0.2,1] }}
+                style={{ height: "100%", borderRadius: 100, background: done ? "linear-gradient(90deg,#4ADE80,#22D3EE)" : "linear-gradient(90deg,#C9A24B,#F472B6)" }} />
+            </div>
+            {!done && <div style={{ marginTop: 6, fontSize: 10, color: "var(--text-3)" }}>{pct}% complete · submit intake leads from your dashboard</div>}
+          </motion.div>
+        )
+      })()}
 
       {/* New / Old Leads toggle */}
       <div style={{ display: "flex", gap: 0, marginBottom: 14, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", alignSelf: "flex-start", width: "fit-content" }}>

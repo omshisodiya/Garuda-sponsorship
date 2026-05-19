@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Users, Lock, Unlock, Activity, Target, TrendingUp,
   PhoneCall, Mail, AlertTriangle, CheckCircle, Loader, Trophy,
-  Inbox, Trash2, ArrowUpRight,
+  Inbox, Trash2, ArrowUpRight, Plus,
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { useSecurityStore } from "../lib/securityStore"
@@ -71,6 +71,8 @@ export default function AdminPage() {
 
   // intake
   const [intakeLeads,    setIntakeLeads]    = useState<IntakeLead[]>([])
+  const [intakeTarget,   setIntakeTarget]   = useState(0)
+  const [myIntakeCount,  setMyIntakeCount]  = useState(0)
   const [intakeFilter,   setIntakeFilter]   = useState<"all" | "new" | "working" | "dead" | "graduated">("all")
   const [graduateConfirm, setGraduateConfirm] = useState<string | null>(null)
   const [deleteConfirm,   setDeleteConfirm]   = useState<string | null>(null)
@@ -86,12 +88,13 @@ export default function AdminPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [leadsRes, auditRes, lbRes, meRes, intakeRes] = await Promise.all([
+        const [leadsRes, auditRes, lbRes, meRes, intakeRes, targetsRes] = await Promise.all([
           fetch("/api/leads"),
           fetch("/api/audit?limit=10"),
           fetch("/api/leaderboard"),
           fetch("/api/auth/me"),
           fetch("/api/intake"),
+          fetch("/api/intake/targets"),
         ])
         if (leadsRes.ok)   setLeads((await leadsRes.json()).leads ?? [])
         if (auditRes.ok)   setAudit((await auditRes.json()).entries ?? [])
@@ -100,8 +103,14 @@ export default function AdminPage() {
           setLeaderboard(d.ranked ?? [])
           setLbMeta({ resetMessage: d.resetMessage ?? "", resetAt: d.resetAt ?? null })
         }
-        if (meRes.ok)      setCurrentUserId((await meRes.json()).user?.id ?? null)
-        if (intakeRes.ok)  setIntakeLeads((await intakeRes.json()).leads ?? [])
+        let uid: string | null = null
+        if (meRes.ok) { uid = (await meRes.json()).user?.id ?? null; setCurrentUserId(uid) }
+        let allIntake: IntakeLead[] = []
+        if (intakeRes.ok) { allIntake = (await intakeRes.json()).leads ?? []; setIntakeLeads(allIntake) }
+        if (uid) {
+          setMyIntakeCount(allIntake.filter(l => l.submitted_by === uid).length)
+          if (targetsRes.ok) { const { targets } = await targetsRes.json(); setIntakeTarget(targets?.[uid] ?? 0) }
+        }
       } catch { /* silent */ } finally { setLoading(false) }
     }
     load()
@@ -202,6 +211,48 @@ export default function AdminPage() {
           </button>
         </div>
       </motion.div>
+
+      {/* Intake target banner — own submission progress */}
+      {intakeTarget > 0 && (() => {
+        const pct  = Math.min(100, Math.round(myIntakeCount / intakeTarget * 100))
+        const done = myIntakeCount >= intakeTarget
+        return (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            style={{ marginBottom: 18, padding: "14px 20px", borderRadius: "var(--r-lg)", border: `1px solid ${done ? "rgba(74,222,128,0.35)" : "rgba(201,162,75,0.35)"}`, background: done ? "rgba(74,222,128,0.06)" : "rgba(201,162,75,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Inbox size={15} color={done ? "#4ADE80" : "#C9A24B"} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-1)" }}>
+                    Your Lead Submission Target
+                    {done && <span style={{ marginLeft: 8, fontSize: 10, color: "#4ADE80", fontWeight: 700 }}>✓ Complete!</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>
+                    {done
+                      ? `You've hit your target of ${intakeTarget} leads`
+                      : `${intakeTarget - myIntakeCount} more lead${intakeTarget - myIntakeCount !== 1 ? "s" : ""} to reach your target of ${intakeTarget}`}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: 22, fontWeight: 900, color: done ? "#4ADE80" : "#C9A24B", fontVariantNumeric: "tabular-nums" }}>{myIntakeCount}</span>
+                  <span style={{ fontSize: 13, color: "var(--text-3)", fontWeight: 500 }}>/{intakeTarget}</span>
+                </div>
+                <button onClick={() => router.push("/team")}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: "var(--r-md)", border: `1px solid ${done ? "rgba(74,222,128,0.4)" : "rgba(201,162,75,0.4)"}`, background: done ? "rgba(74,222,128,0.1)" : "rgba(201,162,75,0.1)", color: done ? "#4ADE80" : "#C9A24B", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  <Plus size={12} /> Add Lead
+                </button>
+              </div>
+            </div>
+            <div style={{ height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 100, overflow: "hidden" }}>
+              <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: [0.4,0,0.2,1] }}
+                style={{ height: "100%", borderRadius: 100, background: done ? "linear-gradient(90deg,#4ADE80,#22D3EE)" : "linear-gradient(90deg,#C9A24B,#F472B6)" }} />
+            </div>
+            {!done && <div style={{ marginTop: 6, fontSize: 10, color: "var(--text-3)" }}>{pct}% complete</div>}
+          </motion.div>
+        )
+      })()}
 
       {/* New / Old toggle */}
       <div style={{ display: "flex", gap: 0, marginBottom: 16, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", width: "fit-content" }}>

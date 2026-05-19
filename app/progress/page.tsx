@@ -73,7 +73,9 @@ function ProgressRing({ value, max, color, size = 56 }: { value: number; max: nu
 export default function ProgressPage() {
   const [stats,      setStats]      = useState<UserProgress[]>([])
   const [loading,    setLoading]    = useState(true)
-  const [role,       setRole]       = useState("team")
+  const [role,       setRole]       = useState<string>(() =>
+    typeof window !== "undefined" ? (sessionStorage.getItem("g_role") ?? "team") : "team"
+  )
   const [filter,     setFilter]     = useState<"all" | "team" | "admin">("all")
   const [sortKey,    setSortKey]    = useState<SortKey>("intakeTotal")
   const [sortDesc,   setSortDesc]   = useState(true)
@@ -95,8 +97,6 @@ export default function ProgressPage() {
   }
 
   useEffect(() => {
-    const r = sessionStorage.getItem("g_role") ?? "team"
-    setRole(r)
     loadStats()
     // Auto-refresh every 60 s so all users see live updates
     const timer = setInterval(() => loadStats(), 60_000)

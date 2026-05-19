@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Inbox, Target, TrendingUp, CheckCircle, XCircle, Clock, Users, ArrowUpDown, Pencil, Check, X as XIcon } from "lucide-react"
+import { Inbox, Target, TrendingUp, CheckCircle, XCircle, Clock, Users, ArrowUpDown, Pencil, Check, X as XIcon, Shuffle } from "lucide-react"
 
 type UserProgress = {
   id: string
@@ -77,9 +77,13 @@ export default function ProgressPage() {
   const [filter,     setFilter]     = useState<"all" | "team" | "admin">("all")
   const [sortKey,    setSortKey]    = useState<SortKey>("intakeTotal")
   const [sortDesc,   setSortDesc]   = useState(true)
-  const [editTarget, setEditTarget] = useState<string | null>(null)   // userId being edited
-  const [editValue,  setEditValue]  = useState("")
-  const [saving,     setSaving]     = useState<Set<string>>(new Set())
+  const [editTarget,   setEditTarget]   = useState<string | null>(null)
+  const [editValue,    setEditValue]    = useState("")
+  const [saving,       setSaving]       = useState<Set<string>>(new Set())
+  const [bulkOpen,     setBulkOpen]     = useState(false)
+  const [bulkTotal,    setBulkTotal]    = useState("")
+  const [bulkMode,     setBulkMode]     = useState<"equal" | "weighted">("weighted")
+  const [bulkApplying, setBulkApplying] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -113,6 +117,64 @@ export default function ProgressPage() {
     } finally {
       setSaving(prev => { const s = new Set(prev); s.delete(userId); return s })
       setEditTarget(null)
+    }
+  }
+
+  // Weighted role factor — same as assign console
+  const ROLE_WEIGHT: Record<string, number> = { team: 1.0, admin: 0.35, superadmin: 0 }
+
+  const bulkEligible = useMemo(
+    () => stats.filter(u => u.role !== "superadmin"),
+    [stats]
+  )
+
+  const bulkPreview = useMemo(() => {
+    const total = parseInt(bulkTotal) || 0
+    if (total <= 0 || bulkEligible.length === 0) return []
+
+    if (bulkMode === "equal") {
+      const each = Math.round(total / bulkEligible.length)
+      return bulkEligible.map((u, i) => ({
+        ...u,
+        newTarget: i === bulkEligible.length - 1 ? total - each * (bulkEligible.length - 1) : each,
+      }))
+    }
+
+    // Weighted
+    const totalWeight = bulkEligible.reduce((s, u) => s + (ROLE_WEIGHT[u.role] ?? 0), 0)
+    let distributed = 0
+    return bulkEligible.map((u, i) => {
+      const weight = ROLE_WEIGHT[u.role] ?? 0
+      const newTarget = i === bulkEligible.length - 1
+        ? Math.max(0, total - distributed)
+        : Math.round(total * weight / totalWeight)
+      distributed += newTarget
+      return { ...u, newTarget }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkTotal, bulkMode, bulkEligible])
+
+  async function applyBulkTargets() {
+    if (bulkPreview.length === 0) return
+    setBulkApplying(true)
+    try {
+      await Promise.all(
+        bulkPreview.map(({ id, newTarget }) =>
+          fetch("/api/intake/targets", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: id, target: newTarget }),
+          }).catch(() => {})
+        )
+      )
+      setStats(prev => prev.map(u => {
+        const preview = bulkPreview.find(p => p.id === u.id)
+        return preview ? { ...u, intakeTarget: preview.newTarget } : u
+      }))
+      setBulkOpen(false)
+      setBulkTotal("")
+    } finally {
+      setBulkApplying(false)
     }
   }
 
@@ -217,6 +279,17 @@ export default function ProgressPage() {
           <SortBtn k="leadsConfirmed"  label="Confirmed" />
           <SortBtn k="name"            label="Name" />
         </div>
+
+        {/* Auto-set targets button — leaders only */}
+        {isLeader && (
+          <button
+            onClick={() => { setBulkOpen(true); setBulkTotal("") }}
+            style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.4)", background: "rgba(201,162,75,0.1)", color: "#C9A24B", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+          >
+            <Shuffle size={13} strokeWidth={2} />
+            Auto-Set Targets
+          </button>
+        )}
       </div>
 
       {/* Cards grid */}
@@ -437,6 +510,134 @@ export default function ProgressPage() {
       {displayed.length === 0 && (
         <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--text-3)", fontSize: 13 }}>No data yet</div>
       )}
+
+      {/* ── Auto-Set Targets Modal ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {bulkOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setBulkOpen(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", zIndex: 500 }}
+            />
+
+            {/* Panel */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -16 }}
+              transition={{ duration: 0.2, ease: [0.4,0,0.2,1] }}
+              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "min(520px,92vw)", background: "var(--bg-2)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-xl)", zIndex: 501, boxShadow: "var(--shadow-xl)", overflow: "hidden" }}
+            >
+              {/* Header */}
+              <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(201,162,75,0.12)", border: "1px solid rgba(201,162,75,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Shuffle size={14} color="#C9A24B" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-1)" }}>Auto-Set Submission Targets</div>
+                    <div style={{ fontSize: 10, color: "var(--text-3)" }}>Distribute a total lead quota across team members</div>
+                  </div>
+                </div>
+                <button onClick={() => setBulkOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", display: "flex" }}><XIcon size={16} /></button>
+              </div>
+
+              <div style={{ padding: "20px 22px" }}>
+                {/* Total input */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--text-2)", display: "block", marginBottom: 7 }}>Total leads to distribute</label>
+                  <input
+                    type="number" min="1" max="9999"
+                    value={bulkTotal}
+                    onChange={e => setBulkTotal(e.target.value)}
+                    placeholder="e.g. 500"
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--r-md)", border: "1px solid var(--brand-edge)", background: "rgba(255,255,255,0.04)", color: "var(--text-1)", fontSize: 16, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+
+                {/* Distribution mode */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--text-2)", display: "block", marginBottom: 9 }}>How to split</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {([
+                      { value: "weighted", label: "Hierarchy weighted", desc: "Team gets more, admin gets less" },
+                      { value: "equal",    label: "Equal split",        desc: "Everyone gets the same amount" },
+                    ] as const).map(opt => (
+                      <button key={opt.value} onClick={() => setBulkMode(opt.value)}
+                        style={{ flex: 1, padding: "10px 14px", borderRadius: "var(--r-md)", border: `1px solid ${bulkMode === opt.value ? "rgba(201,162,75,0.5)" : "var(--brand-edge)"}`, background: bulkMode === opt.value ? "rgba(201,162,75,0.1)" : "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "all 0.14s" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
+                          <div style={{ width: 13, height: 13, borderRadius: "50%", border: `2px solid ${bulkMode === opt.value ? "#C9A24B" : "var(--text-3)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            {bulkMode === opt.value && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#C9A24B" }} />}
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: bulkMode === opt.value ? "#C9A24B" : "var(--text-2)" }}>{opt.label}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--text-3)", paddingLeft: 20 }}>{opt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview table */}
+                {bulkPreview.length > 0 && (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-2)", marginBottom: 8 }}>
+                      Preview
+                      <span style={{ marginLeft: 8, fontSize: 10, color: "var(--text-3)", fontWeight: 400 }}>
+                        (total distributed: {bulkPreview.reduce((s, u) => s + u.newTarget, 0)} / {parseInt(bulkTotal) || 0})
+                      </span>
+                    </div>
+                    <div style={{ border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden" }}>
+                      {bulkPreview.map((u, i) => {
+                        const rb = ROLE_BADGE[u.role] ?? ROLE_BADGE.team
+                        const pct = parseInt(bulkTotal) ? Math.round(u.newTarget / parseInt(bulkTotal) * 100) : 0
+                        return (
+                          <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderBottom: i < bulkPreview.length - 1 ? "1px solid var(--brand-edge)" : "none", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}>
+                            <div style={{ width: 28, height: 28, borderRadius: 8, background: `${u.color}20`, border: `1px solid ${u.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: u.color, flexShrink: 0 }}>
+                              {u.initials}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
+                                <span style={{ fontSize: 8, padding: "1px 6px", borderRadius: 100, background: `${rb.color}18`, color: rb.color, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>{rb.label}</span>
+                              </div>
+                              <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 100, overflow: "hidden" }}>
+                                <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }}
+                                  style={{ height: "100%", background: rb.color, borderRadius: 100 }} />
+                              </div>
+                            </div>
+                            <div style={{ textAlign: "right", flexShrink: 0 }}>
+                              <div style={{ fontSize: 16, fontWeight: 900, color: "var(--text-1)", fontVariantNumeric: "tabular-nums" }}>{u.newTarget}</div>
+                              <div style={{ fontSize: 9, color: "var(--text-3)" }}>{pct}%</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button onClick={() => setBulkOpen(false)} className="btn-ghost" style={{ fontSize: 12 }}>Cancel</button>
+                  <button
+                    onClick={applyBulkTargets}
+                    disabled={bulkPreview.length === 0 || bulkApplying}
+                    style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.4)", background: bulkPreview.length === 0 ? "rgba(255,255,255,0.04)" : "rgba(201,162,75,0.14)", color: bulkPreview.length === 0 ? "var(--text-3)" : "#C9A24B", fontSize: 12, fontWeight: 700, cursor: bulkPreview.length === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "all 0.15s" }}
+                  >
+                    {bulkApplying ? (
+                      <><div style={{ width: 12, height: 12, border: "2px solid rgba(201,162,75,0.3)", borderTopColor: "#C9A24B", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Applying…</>
+                    ) : (
+                      <><Check size={13} /> Apply to All</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

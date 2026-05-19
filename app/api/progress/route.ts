@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getSessionFromCookies } from "@/app/lib/server/auth"
 import { getAllLeads } from "@/app/lib/server/leadStore"
 import { getAllUsers } from "@/app/lib/server/store"
+import { getIntakeTargets } from "@/app/lib/server/intakeStore"
 import { db, type Row } from "@/app/lib/server/db"
 import { TEAM } from "@/app/lib/data"
 
@@ -21,7 +22,7 @@ export async function GET() {
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
 
-  const [allLeads, allUsers] = await Promise.all([getAllLeads(), getAllUsers()])
+  const [allLeads, allUsers, targets] = await Promise.all([getAllLeads(), getAllUsers(), getIntakeTargets()])
 
   // Fetch all intake rows (status + submitted_by)
   let intakeRows: Row[] = []
@@ -66,6 +67,7 @@ export async function GET() {
       id:              u.id,
       name:            u.name,
       role:            u.role,
+      intakeTarget:    targets[u.id] ?? 0,
       initials:        teamMember?.initials ?? initials(u.name),
       color:           teamMember?.color    ?? stableColor(u.id),
       intakeTotal,

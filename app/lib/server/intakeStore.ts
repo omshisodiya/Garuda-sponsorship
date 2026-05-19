@@ -50,6 +50,14 @@ async function _init(): Promise<void> {
       updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `
+  await db()`
+    CREATE TABLE IF NOT EXISTS garuda_intake_targets (
+      user_id  TEXT PRIMARY KEY,
+      target   INTEGER NOT NULL DEFAULT 0,
+      set_by   TEXT NOT NULL,
+      set_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `
 }
 
 function rowToIntake(row: Row): IntakeLead {
@@ -154,6 +162,28 @@ export async function deleteIntakeLead(id: string): Promise<boolean> {
   await ensureInit()
   const rows = await db()`DELETE FROM garuda_intake WHERE id = ${id} RETURNING id`
   return rows.length > 0
+}
+
+// ── Intake targets ────────────────────────────────────────────────────────────
+
+export async function getIntakeTargets(): Promise<Record<string, number>> {
+  await ensureInit()
+  try {
+    const rows = await db()`SELECT user_id, target FROM garuda_intake_targets`
+    const out: Record<string, number> = {}
+    for (const r of rows) out[String(r.user_id)] = Number(r.target)
+    return out
+  } catch { return {} }
+}
+
+export async function setIntakeTarget(userId: string, target: number, setBy: string): Promise<void> {
+  await ensureInit()
+  await db()`
+    INSERT INTO garuda_intake_targets (user_id, target, set_by, set_at)
+    VALUES (${userId}, ${target}, ${setBy}, now())
+    ON CONFLICT (user_id) DO UPDATE
+      SET target = EXCLUDED.target, set_by = EXCLUDED.set_by, set_at = now()
+  `
 }
 
 // XP per submission: 10 for any live lead, 25 for graduated

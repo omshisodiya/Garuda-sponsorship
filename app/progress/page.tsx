@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
-import { motion } from "framer-motion"
-import { Inbox, Target, TrendingUp, CheckCircle, XCircle, Clock, Users, ArrowUpDown } from "lucide-react"
+import { useEffect, useState, useMemo, useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Inbox, Target, TrendingUp, CheckCircle, XCircle, Clock, Users, ArrowUpDown, Pencil, Check, X as XIcon } from "lucide-react"
 
 type UserProgress = {
   id: string
@@ -10,6 +10,7 @@ type UserProgress = {
   role: string
   initials: string
   color: string
+  intakeTarget: number
   intakeTotal: number
   intakeNew: number
   intakeWorking: number
@@ -70,12 +71,16 @@ function ProgressRing({ value, max, color, size = 56 }: { value: number; max: nu
 }
 
 export default function ProgressPage() {
-  const [stats,    setStats]    = useState<UserProgress[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [role,     setRole]     = useState("team")
-  const [filter,   setFilter]   = useState<"all" | "team" | "admin">("all")
-  const [sortKey,  setSortKey]  = useState<SortKey>("intakeTotal")
-  const [sortDesc, setSortDesc] = useState(true)
+  const [stats,      setStats]      = useState<UserProgress[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [role,       setRole]       = useState("team")
+  const [filter,     setFilter]     = useState<"all" | "team" | "admin">("all")
+  const [sortKey,    setSortKey]    = useState<SortKey>("intakeTotal")
+  const [sortDesc,   setSortDesc]   = useState(true)
+  const [editTarget, setEditTarget] = useState<string | null>(null)   // userId being edited
+  const [editValue,  setEditValue]  = useState("")
+  const [saving,     setSaving]     = useState<Set<string>>(new Set())
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const r = sessionStorage.getItem("g_role") ?? "team"
@@ -86,6 +91,30 @@ export default function ProgressPage() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  function startEdit(userId: string, current: number) {
+    setEditTarget(userId)
+    setEditValue(current === 0 ? "" : String(current))
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  async function saveTarget(userId: string) {
+    const target = Math.max(0, parseInt(editValue) || 0)
+    setSaving(prev => new Set(prev).add(userId))
+    try {
+      const res = await fetch("/api/intake/targets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, target }),
+      })
+      if (res.ok) {
+        setStats(prev => prev.map(u => u.id === userId ? { ...u, intakeTarget: target } : u))
+      }
+    } finally {
+      setSaving(prev => { const s = new Set(prev); s.delete(userId); return s })
+      setEditTarget(null)
+    }
+  }
 
   const isLeader = role === "admin" || role === "superadmin"
 
@@ -227,8 +256,72 @@ export default function ProgressPage() {
                     <Inbox size={12} color="#60A5FA" />
                     <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-2)" }}>Leads Submitted to Intake</span>
                   </div>
-                  <span style={{ fontSize: 18, fontWeight: 900, color: "var(--text-1)", fontVariantNumeric: "tabular-nums" }}>{u.intakeTotal}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: "var(--text-1)", fontVariantNumeric: "tabular-nums" }}>
+                      {u.intakeTotal}{u.intakeTarget > 0 && <span style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 500 }}>/{u.intakeTarget}</span>}
+                    </span>
+                    {/* Target edit — leaders only */}
+                    {isLeader && (
+                      editTarget === u.id ? (
+                        <AnimatePresence>
+                          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                            style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <input
+                              ref={inputRef}
+                              type="number" min="0" max="9999"
+                              value={editValue}
+                              onChange={e => setEditValue(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter") saveTarget(u.id); if (e.key === "Escape") setEditTarget(null) }}
+                              style={{ width: 54, padding: "3px 7px", borderRadius: "var(--r-sm)", border: "1px solid rgba(201,162,75,0.5)", background: "rgba(201,162,75,0.08)", color: "var(--text-1)", fontSize: 11, fontFamily: "inherit", outline: "none" }}
+                              placeholder="target"
+                            />
+                            <button onClick={() => saveTarget(u.id)} disabled={saving.has(u.id)}
+                              style={{ width: 22, height: 22, borderRadius: "var(--r-sm)", border: "1px solid rgba(74,222,128,0.4)", background: "rgba(74,222,128,0.1)", color: "#4ADE80", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <Check size={11} />
+                            </button>
+                            <button onClick={() => setEditTarget(null)}
+                              style={{ width: 22, height: 22, borderRadius: "var(--r-sm)", border: "1px solid rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.08)", color: "#F87171", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <XIcon size={11} />
+                            </button>
+                          </motion.div>
+                        </AnimatePresence>
+                      ) : (
+                        <button onClick={() => startEdit(u.id, u.intakeTarget)}
+                          title="Set lead submission target"
+                          style={{ width: 22, height: 22, borderRadius: "var(--r-sm)", border: "1px solid var(--brand-edge)", background: "transparent", color: "var(--text-3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.14s" }}>
+                          <Pencil size={10} />
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
+
+                {/* Target progress bar */}
+                {u.intakeTarget > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Target Progress</span>
+                      <span style={{ fontSize: 9, color: u.intakeTotal >= u.intakeTarget ? "#4ADE80" : "#C9A24B", fontWeight: 700 }}>
+                        {Math.min(100, Math.round(u.intakeTotal / u.intakeTarget * 100))}%
+                        {u.intakeTotal >= u.intakeTarget && " ✓"}
+                      </span>
+                    </div>
+                    <div style={{ height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 100, overflow: "hidden", position: "relative" }}>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, u.intakeTotal / u.intakeTarget * 100)}%` }}
+                        transition={{ duration: 0.8, ease: [0.4,0,0.2,1] }}
+                        style={{ height: "100%", borderRadius: 100, background: u.intakeTotal >= u.intakeTarget ? "linear-gradient(90deg,#4ADE80,#22D3EE)" : "linear-gradient(90deg,#C9A24B,#F472B6)" }}
+                      />
+                    </div>
+                    {u.intakeTotal < u.intakeTarget && (
+                      <div style={{ fontSize: 9, color: "var(--text-3)", marginTop: 3 }}>
+                        {u.intakeTarget - u.intakeTotal} more needed to hit target
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {u.intakeTotal > 0 && (
                   <>
                     {/* Segmented bar */}
@@ -265,7 +358,8 @@ export default function ProgressPage() {
                   </>
                 )}
                 {u.intakeTotal === 0 && (
-                  <div style={{ fontSize: 11, color: "var(--text-3)", fontStyle: "italic" }}>No leads submitted yet</div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", fontStyle: "italic" }}>
+                    {u.intakeTarget > 0 ? `0 / ${u.intakeTarget} — target not started yet` : "No leads submitted yet"}</div>
                 )}
               </div>
 

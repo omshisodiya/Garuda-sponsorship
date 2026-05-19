@@ -22,7 +22,7 @@ export async function GET() {
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
 
-  const [allLeads, allUsers, targets] = await Promise.all([getAllLeads(), getAllUsers(), getIntakeTargets()])
+  const [allLeads, allUsers, intakeTargets] = await Promise.all([getAllLeads(), getAllUsers(), getIntakeTargets()])
 
   // Fetch all intake rows (status + submitted_by)
   let intakeRows: Row[] = []
@@ -33,11 +33,11 @@ export async function GET() {
   const teamByName = new Map(TEAM.map(m => [m.name.toLowerCase().trim(), m]))
 
   // Which users to include
-  const targets = session.role === "team"
+  const usersToShow = session.role === "team"
     ? allUsers.filter(u => u.id === session.sub)
     : allUsers.filter(u => u.role !== "superadmin")
 
-  const stats = targets.map(u => {
+  const stats = usersToShow.map(u => {
     const nameLower  = u.name.toLowerCase().trim()
     const teamMember = teamByName.get(nameLower)
 
@@ -67,7 +67,7 @@ export async function GET() {
       id:              u.id,
       name:            u.name,
       role:            u.role,
-      intakeTarget:    targets[u.id] ?? 0,
+      intakeTarget:    intakeTargets[u.id] ?? 0,
       initials:        teamMember?.initials ?? initials(u.name),
       color:           teamMember?.color    ?? stableColor(u.id),
       intakeTotal,

@@ -86,14 +86,22 @@ export default function ProgressPage() {
   const [bulkApplying, setBulkApplying] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    const r = sessionStorage.getItem("g_role") ?? "team"
-    setRole(r)
-    fetch("/api/progress")
+  function loadStats() {
+    return fetch("/api/progress")
       .then(res => res.ok ? res.json() : { stats: [] })
       .then(d => setStats(d.stats ?? []))
       .catch(() => {})
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    const r = sessionStorage.getItem("g_role") ?? "team"
+    setRole(r)
+    loadStats()
+    // Auto-refresh every 60 s so all users see live updates
+    const timer = setInterval(() => loadStats(), 60_000)
+    return () => clearInterval(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function startEdit(userId: string, current: number) {
@@ -118,6 +126,8 @@ export default function ProgressPage() {
       setSaving(prev => { const s = new Set(prev); s.delete(userId); return s })
       setEditTarget(null)
     }
+    // Sync in background after save
+    loadStats()
   }
 
   // Weighted role factor — same as assign console
@@ -173,6 +183,8 @@ export default function ProgressPage() {
       }))
       setBulkOpen(false)
       setBulkTotal("")
+      // Re-fetch to confirm server state
+      loadStats()
     } finally {
       setBulkApplying(false)
     }
@@ -226,23 +238,23 @@ export default function ProgressPage() {
     <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-        style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>Progress · Activity Tracker</div>
-          <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: "0 0 4px" }}>Lead Progress Board</h1>
-          <p style={{ color: "var(--text-3)", fontSize: 12, margin: 0 }}>Track who added leads, how many graduated, and how many assigned leads are being worked on</p>
-        </div>
-        {isLeader && (
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
+        <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>Progress · Activity Tracker</div>
+        <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: "0 0 4px" }}>Lead Progress Board</h1>
+        <p style={{ color: "var(--text-3)", fontSize: 12, margin: 0 }}>Track who added leads, how many graduated, and how many assigned leads are being worked on</p>
+      </motion.div>
+
+      {/* Auto-Set Targets — leaders only, always-visible standalone row */}
+      {isLeader && (
+        <div style={{ marginBottom: 18 }}>
           <button
             onClick={() => { setBulkOpen(true); setBulkTotal("") }}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.4)", background: "rgba(201,162,75,0.1)", color: "#C9A24B", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.5)", background: "rgba(201,162,75,0.12)", color: "#C9A24B", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
           >
-            <Shuffle size={14} strokeWidth={2} />
-            Auto-Set Targets
+            <Shuffle size={13} /> Auto-Set Targets
           </button>
-        )}
-      </motion.div>
+        </div>
+      )}
 
       {/* Summary KPI row — leaders only */}
       {isLeader && (

@@ -40,8 +40,12 @@ export async function GET() {
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
 
-  const [leads, dbUsers, xpMap, resetData, penaltyPct, intakeXpMap] = await Promise.all([
-    getAllLeads(), getAllUsers(), getAllUsersXP(), getLeaderboardReset(), getXpPenalty(), getIntakeXpByUser(),
+  // Fetch reset timestamp first so we can filter XP to post-reset activity only
+  const resetData = await getLeaderboardReset()
+  const resetAt   = resetData.resetAt ?? null   // ISO string or null
+
+  const [leads, dbUsers, xpMap, penaltyPct, intakeXpMap] = await Promise.all([
+    getAllLeads(), getAllUsers(), getAllUsersXP(), getXpPenalty(), getIntakeXpByUser(resetAt),
   ])
 
   // Name→TEAM entry lookup for color/initials override
@@ -54,7 +58,11 @@ export async function GET() {
     .map(u => {
       const nameLower  = u.name.toLowerCase().trim()
       const teamMember = teamByName.get(nameLower)
-      const mLeads     = leads.filter(l => l.assigned_to === u.id)
+      // Only count lead XP from leads that were last worked AFTER the reset
+      const mLeads = leads.filter(l =>
+        l.assigned_to === u.id &&
+        (!resetAt || l.last_activity >= resetAt)
+      )
       const leadXp     = mLeads.reduce((s, l) => s + xpForLead(l), 0) + (intakeXpMap[u.id] ?? 0)
       const missionXp  = xpMap[u.id] ?? 0
       const xp         = Math.floor((leadXp + missionXp) * multiplier)

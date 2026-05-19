@@ -187,12 +187,19 @@ export async function setIntakeTarget(userId: string, target: number, setBy: str
 }
 
 // XP per submission: 10 for any live lead, 25 for graduated
-export async function getIntakeXpByUser(): Promise<Record<string, number>> {
+// Pass `since` (ISO string) to only count submissions after a leaderboard reset
+export async function getIntakeXpByUser(since?: string | null): Promise<Record<string, number>> {
   await ensureInit()
-  const rows = await db()`
-    SELECT submitted_by, status FROM garuda_intake
-    WHERE status IN ('new','working','dead','graduated')
-  `
+  const rows = since
+    ? await db()`
+        SELECT submitted_by, status FROM garuda_intake
+        WHERE status IN ('new','working','dead','graduated')
+          AND created_at >= ${since}::timestamptz
+      `
+    : await db()`
+        SELECT submitted_by, status FROM garuda_intake
+        WHERE status IN ('new','working','dead','graduated')
+      `
   const out: Record<string, number> = {}
   for (const r of rows) {
     const uid = String(r.submitted_by)

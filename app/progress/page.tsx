@@ -235,7 +235,7 @@ export default function ProgressPage() {
   )
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto", width: "100%", boxSizing: "border-box", overflowX: "hidden" }}>
+    <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }}>
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
@@ -244,45 +244,10 @@ export default function ProgressPage() {
         <p style={{ color: "var(--text-3)", fontSize: 12, margin: 0 }}>Track who added leads, how many graduated, and how many assigned leads are being worked on</p>
       </motion.div>
 
-      {/* Auto-Set Targets — leaders only, always-visible standalone row */}
-      {isLeader && (
-        <div style={{ marginBottom: 18 }}>
-          <button
-            onClick={() => { setBulkOpen(true); setBulkTotal("") }}
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.5)", background: "rgba(201,162,75,0.12)", color: "#C9A24B", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            <Shuffle size={13} /> Auto-Set Targets
-          </button>
-        </div>
-      )}
-
-      {/* Summary KPI row — leaders only */}
-      {isLeader && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
-          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px,1fr))", gap: 12, marginBottom: 22 }}>
-          {[
-            { label: "Total Submitted",   value: totals.intake,    icon: Inbox,       color: "#60A5FA" },
-            { label: "Graduated to Vault",value: totals.graduated, icon: CheckCircle, color: "#4ADE80" },
-            { label: "Leads Assigned",    value: totals.assigned,  icon: Users,       color: "#C9A24B" },
-            { label: "Leads Worked",      value: totals.worked,    icon: TrendingUp,  color: "#A78BFA" },
-            { label: "Deals Confirmed",   value: totals.confirmed, icon: Target,      color: "#FB923C" },
-          ].map(({ label, value, icon: Icon, color }, i) => (
-            <motion.div key={label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 * i }}
-              style={{ padding: "14px 16px", background: "var(--glass-1)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-lg)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <Icon size={13} color={color} />
-                <span style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>{label}</span>
-              </div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: "var(--text-1)", fontVariantNumeric: "tabular-nums" }}>{value}</div>
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Controls */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center", minWidth: 0 }}>
-        {isLeader && (
-          <div style={{ display: "flex", gap: 0, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden" }}>
+      {/* Row: filter + Auto-Set Targets button */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        {isLeader ? (
+          <div style={{ display: "flex", gap: 0, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", flexShrink: 0 }}>
             {(["all", "team", "admin"] as const).map((f, i) => (
               <button key={f} onClick={() => setFilter(f)}
                 style={{ padding: "8px 16px", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit",
@@ -293,21 +258,52 @@ export default function ProgressPage() {
               </button>
             ))}
           </div>
+        ) : <div />}
+        {isLeader && (
+          <button
+            onClick={() => { setBulkOpen(true); setBulkTotal("") }}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.5)", background: "rgba(201,162,75,0.12)", color: "#C9A24B", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, whiteSpace: "nowrap" }}
+          >
+            <Shuffle size={13} /> Auto-Set Targets
+          </button>
         )}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, color: "var(--text-3)", alignSelf: "center", marginRight: 2 }}>Sort:</span>
-          <SortBtn k="intakeTotal"     label="Submitted" />
-          <SortBtn k="intakeGraduated" label="Graduated" />
-          <SortBtn k="leadsTotal"      label="Assigned" />
-          <SortBtn k="leadsWorked"     label="Worked" />
-          <SortBtn k="leadsConfirmed"  label="Confirmed" />
-          <SortBtn k="name"            label="Name" />
-        </div>
+      </div>
 
+      {/* Summary KPI row — leaders only */}
+      {isLeader && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px,1fr))", gap: 12, marginBottom: 18 }}>
+          {[
+            { label: "Total Submitted",   value: totals.intake,    icon: Inbox,       color: "#60A5FA" },
+            { label: "Graduated to Vault",value: totals.graduated, icon: CheckCircle, color: "#4ADE80" },
+            { label: "Leads Assigned",    value: totals.assigned,  icon: Users,       color: "#C9A24B" },
+            { label: "Leads Worked",      value: totals.worked,    icon: TrendingUp,  color: "#A78BFA" },
+            { label: "Deals Confirmed",   value: totals.confirmed, icon: Target,      color: "#FB923C" },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label}
+              style={{ padding: "14px 16px", background: "var(--glass-1)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-lg)", minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <Icon size={13} color={color} />
+                <span style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>{label}</span>
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 900, color: "var(--text-1)", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sort row */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 18 }}>
+        <span style={{ fontSize: 10, color: "var(--text-3)", alignSelf: "center", marginRight: 2 }}>Sort:</span>
+        <SortBtn k="intakeTotal"     label="Submitted" />
+        <SortBtn k="intakeGraduated" label="Graduated" />
+        <SortBtn k="leadsTotal"      label="Assigned" />
+        <SortBtn k="leadsWorked"     label="Worked" />
+        <SortBtn k="leadsConfirmed"  label="Confirmed" />
+        <SortBtn k="name"            label="Name" />
       </div>
 
       {/* Cards grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px,100%),1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px,1fr))", gap: 14 }}>
         {displayed.map((u, i) => {
           const rb = ROLE_BADGE[u.role] ?? ROLE_BADGE.team
           const intakeActivePct = u.intakeTotal === 0 ? 0 : Math.round((u.intakeGraduated + u.intakeWorking) / u.intakeTotal * 100)

@@ -235,7 +235,7 @@ export default function ProgressPage() {
   )
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }}>
+    <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto", width: "100%", boxSizing: "border-box", overflowX: "hidden" }}>
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
@@ -280,7 +280,7 @@ export default function ProgressPage() {
       )}
 
       {/* Controls */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center", minWidth: 0 }}>
         {isLeader && (
           <div style={{ display: "flex", gap: 0, background: "rgba(0,0,0,0.3)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden" }}>
             {(["all", "team", "admin"] as const).map((f, i) => (
@@ -307,7 +307,7 @@ export default function ProgressPage() {
       </div>
 
       {/* Cards grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px,1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px,100%),1fr))", gap: 14 }}>
         {displayed.map((u, i) => {
           const rb = ROLE_BADGE[u.role] ?? ROLE_BADGE.team
           const intakeActivePct = u.intakeTotal === 0 ? 0 : Math.round((u.intakeGraduated + u.intakeWorking) / u.intakeTotal * 100)

@@ -340,7 +340,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="g-bg" />
         <div className="g-bg-grid" />
 
-        <div style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1, ["--sidebar-w" as string]: `${sideW}px` } as React.CSSProperties}>
 
           {/* SIDEBAR */}
           <motion.aside

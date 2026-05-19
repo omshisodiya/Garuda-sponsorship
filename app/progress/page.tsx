@@ -532,13 +532,14 @@ export default function ProgressPage() {
               style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", zIndex: 500 }}
             />
 
-            {/* Panel */}
+            {/* Panel — centered in content area (not full viewport) */}
+            <div style={{ position: "fixed", inset: 0, paddingLeft: "var(--sidebar-w, 0px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 501, pointerEvents: "none" }}>
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: -16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -16 }}
               transition={{ duration: 0.2, ease: [0.4,0,0.2,1] }}
-              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "min(520px,92vw)", background: "var(--bg-2)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-xl)", zIndex: 501, boxShadow: "var(--shadow-xl)", overflow: "hidden" }}
+              style={{ width: "min(520px,92vw)", background: "var(--bg-2)", border: "1px solid var(--brand-edge)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-xl)", overflow: "hidden", pointerEvents: "auto" }}
             >
               {/* Header */}
               <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid var(--brand-edge)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -645,6 +646,7 @@ export default function ProgressPage() {
                 </div>
               </div>
             </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>

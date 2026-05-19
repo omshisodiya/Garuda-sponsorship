@@ -88,6 +88,7 @@ export default function ProgressPage() {
   const [bulkTotal,    setBulkTotal]    = useState("")
   const [bulkMode,     setBulkMode]     = useState<"equal" | "weighted">("weighted")
   const [bulkApplying, setBulkApplying] = useState(false)
+  const [myId,         setMyId]         = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function loadStats() {
@@ -99,6 +100,9 @@ export default function ProgressPage() {
   }
 
   useEffect(() => {
+    fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(d => {
+      if (d?.user?.id) setMyId(d.user.id)
+    }).catch(() => {})
     loadStats()
     // Auto-refresh every 60 s so all users see live updates
     const timer = setInterval(() => loadStats(), 60_000)
@@ -304,9 +308,10 @@ export default function ProgressPage() {
         <SortBtn k="name"            label="Name" />
       </div>
 
-      {/* Team member — intake target banner + CTA */}
-      {!isLeader && displayed.length > 0 && (() => {
-        const me = displayed[0]
+      {/* Own intake target banner + CTA — team and admin (not superadmin) */}
+      {role !== "superadmin" && (() => {
+        const me = myId ? stats.find(u => u.id === myId) : (role === "team" ? stats[0] : null)
+        if (!me) return null
         const pct = me.intakeTarget > 0 ? Math.min(100, Math.round(me.intakeTotal / me.intakeTarget * 100)) : 0
         const done = me.intakeTarget > 0 && me.intakeTotal >= me.intakeTarget
         return (

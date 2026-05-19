@@ -599,29 +599,17 @@ export default function ProgressPage() {
                         (total distributed: {bulkPreview.reduce((s, u) => s + u.newTarget, 0)} / {parseInt(bulkTotal) || 0})
                       </span>
                     </div>
-                    <div style={{ border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden" }}>
+                    <div style={{ border: "1px solid var(--brand-edge)", borderRadius: "var(--r-md)", overflow: "hidden", maxHeight: 260, overflowY: "auto" }}>
                       {bulkPreview.map((u, i) => {
                         const rb = ROLE_BADGE[u.role] ?? ROLE_BADGE.team
-                        const pct = parseInt(bulkTotal) ? Math.round(u.newTarget / parseInt(bulkTotal) * 100) : 0
                         return (
-                          <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderBottom: i < bulkPreview.length - 1 ? "1px solid var(--brand-edge)" : "none", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}>
-                            <div style={{ width: 28, height: 28, borderRadius: 8, background: `${u.color}20`, border: `1px solid ${u.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: u.color, flexShrink: 0 }}>
+                          <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: i < bulkPreview.length - 1 ? "1px solid var(--brand-edge)" : "none", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}>
+                            <div style={{ width: 26, height: 26, borderRadius: 7, background: `${u.color}20`, border: `1px solid ${u.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: u.color, flexShrink: 0 }}>
                               {u.initials}
                             </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
-                                <span style={{ fontSize: 8, padding: "1px 6px", borderRadius: 100, background: `${rb.color}18`, color: rb.color, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>{rb.label}</span>
-                              </div>
-                              <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 100, overflow: "hidden" }}>
-                                <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }}
-                                  style={{ height: "100%", background: rb.color, borderRadius: 100 }} />
-                              </div>
-                            </div>
-                            <div style={{ textAlign: "right", flexShrink: 0 }}>
-                              <div style={{ fontSize: 16, fontWeight: 900, color: "var(--text-1)", fontVariantNumeric: "tabular-nums" }}>{u.newTarget}</div>
-                              <div style={{ fontSize: 9, color: "var(--text-3)" }}>{pct}%</div>
-                            </div>
+                            <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "var(--text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
+                            <span style={{ fontSize: 8, padding: "2px 7px", borderRadius: 100, background: `${rb.color}18`, color: rb.color, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>{rb.label}</span>
+                            <span style={{ fontSize: 16, fontWeight: 900, color: "var(--text-1)", fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 32, textAlign: "right" }}>{u.newTarget}</span>
                           </div>
                         )
                       })}

@@ -226,10 +226,22 @@ export default function ProgressPage() {
     <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
-        <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>Progress · Activity Tracker</div>
-        <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: "0 0 4px" }}>Lead Progress Board</h1>
-        <p style={{ color: "var(--text-3)", fontSize: 12, margin: 0 }}>Track who added leads, how many graduated, and how many assigned leads are being worked on</p>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+        style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <div className="g-label" style={{ marginBottom: 5, color: "var(--text-brand)" }}>Progress · Activity Tracker</div>
+          <h1 style={{ fontSize: "clamp(20px,3vw,30px)", fontWeight: 900, letterSpacing: "-0.02em", color: "var(--text-1)", margin: "0 0 4px" }}>Lead Progress Board</h1>
+          <p style={{ color: "var(--text-3)", fontSize: 12, margin: 0 }}>Track who added leads, how many graduated, and how many assigned leads are being worked on</p>
+        </div>
+        {isLeader && (
+          <button
+            onClick={() => { setBulkOpen(true); setBulkTotal("") }}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.4)", background: "rgba(201,162,75,0.1)", color: "#C9A24B", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+          >
+            <Shuffle size={14} strokeWidth={2} />
+            Auto-Set Targets
+          </button>
+        )}
       </motion.div>
 
       {/* Summary KPI row — leaders only */}
@@ -280,16 +292,6 @@ export default function ProgressPage() {
           <SortBtn k="name"            label="Name" />
         </div>
 
-        {/* Auto-set targets button — leaders only */}
-        {isLeader && (
-          <button
-            onClick={() => { setBulkOpen(true); setBulkTotal("") }}
-            style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: "var(--r-md)", border: "1px solid rgba(201,162,75,0.4)", background: "rgba(201,162,75,0.1)", color: "#C9A24B", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
-          >
-            <Shuffle size={13} strokeWidth={2} />
-            Auto-Set Targets
-          </button>
-        )}
       </div>
 
       {/* Cards grid */}

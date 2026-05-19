@@ -135,12 +135,13 @@ export default function AssignPage() {
     )
   }
 
-  async function autoDistribute() {
+  async function autoDistribute(view?: "new" | "old") {
+    const effectiveView = view ?? leadView
     const pool = assignable.filter(u => u.role !== "superadmin")
     const toAssign = leads.filter(l =>
       l.assigned_to === null &&
       !["confirmed", "rejected"].includes(l.status) &&
-      (leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF)
+      (effectiveView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF)
     )
     if (toAssign.length === 0 || pool.length === 0) return
     setDistributing(true)
@@ -250,15 +251,36 @@ export default function AssignPage() {
             </div>
           )}
         </div>
-        <button
-          className="btn-gold"
-          onClick={autoDistribute}
-          disabled={distributing || unassigned === 0 || assignable.length === 0}
-          style={{ fontSize: 11, opacity: (unassigned === 0 || assignable.length === 0) ? 0.4 : 1 }}
-        >
-          <Shuffle size={13} strokeWidth={2} />
-          {distributing ? "Distributing…" : `Auto-Distribute (${unassigned})`}
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {/* New leads distribute */}
+          {(() => {
+            const newUnassigned = leads.filter(l => l.assigned_to === null && !["confirmed","rejected"].includes(l.status) && l.created_at >= LEGACY_CUTOFF).length
+            return (
+              <button
+                onClick={() => { setLeadView("new"); setSelected(new Set()); autoDistribute("new") }}
+                disabled={distributing || newUnassigned === 0 || assignable.filter(u => u.role !== "superadmin").length === 0}
+                style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: "var(--r-md)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: newUnassigned === 0 ? "not-allowed" : "pointer", border: "1px solid rgba(74,222,128,0.35)", background: "rgba(74,222,128,0.1)", color: "#4ADE80", opacity: newUnassigned === 0 ? 0.4 : 1, transition: "all 0.15s" }}
+              >
+                <Shuffle size={13} strokeWidth={2} />
+                {distributing && leadView === "new" ? "Distributing…" : `Distribute New Leads (${newUnassigned})`}
+              </button>
+            )
+          })()}
+          {/* Old leads distribute */}
+          {(() => {
+            const oldUnassigned = leads.filter(l => l.assigned_to === null && !["confirmed","rejected"].includes(l.status) && l.created_at < LEGACY_CUTOFF).length
+            return (
+              <button
+                onClick={() => { setLeadView("old"); setSelected(new Set()); autoDistribute("old") }}
+                disabled={distributing || oldUnassigned === 0 || assignable.filter(u => u.role !== "superadmin").length === 0}
+                style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: "var(--r-md)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: oldUnassigned === 0 ? "not-allowed" : "pointer", border: "1px solid rgba(201,162,75,0.35)", background: "rgba(201,162,75,0.08)", color: "#C9A24B", opacity: oldUnassigned === 0 ? 0.4 : 1, transition: "all 0.15s" }}
+              >
+                <Shuffle size={13} strokeWidth={2} />
+                {distributing && leadView === "old" ? "Distributing…" : `Distribute Old Leads (${oldUnassigned})`}
+              </button>
+            )
+          })()}
+        </div>
       </motion.div>
 
       {/* New / Old toggle */}

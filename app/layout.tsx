@@ -10,6 +10,7 @@ import {
   Users, Vault, Mail, Target, Brain, Shield, ChevronLeft,
   ChevronRight, Search, LogOut, Flame, Map, Trophy, BookOpen,
   Terminal, Sun, Moon, AlertCircle, Info, AlertTriangle, X as XIcon,
+  BarChart2,
 } from "lucide-react"
 
 type InboxNotif = {
@@ -52,12 +53,14 @@ const NAV: Record<string, Array<{ label: string; href: string; icon: React.Eleme
     { label: "AI Copilot",       href: "/copilot",          icon: Brain,  badge: "AI" },
     { label: "Users",            href: "/users",            icon: Users },
     { label: "Credential Vault", href: "/superadmin/vault", icon: Shield },
+    { label: "Progress Board",   href: "/progress",         icon: BarChart2 },
   ],
   admin: [
     { label: "Dashboard",        href: "/admin",            icon: LayoutDashboard },
     { label: "Lead Vault",       href: "/leads",            icon: Database },
     { label: "Pipeline Board",   href: "/pipeline",         icon: Columns3 },
     { label: "Assignments",      href: "/assign",           icon: GitBranch },
+    { label: "Progress Board",   href: "/progress",         icon: BarChart2 },
     { label: "Users",            href: "/users",            icon: Users },
     { label: "Signals",          href: "/signals",          icon: Zap,    badge: "AI" },
     { label: "Alerts",           href: "/alerts",           icon: Bell },
@@ -69,6 +72,7 @@ const NAV: Record<string, Array<{ label: string; href: string; icon: React.Eleme
     { label: "My Dashboard",     href: "/team",             icon: LayoutDashboard },
     { label: "My Leads",         href: "/leads",            icon: Database },
     { label: "Pipeline",         href: "/pipeline",         icon: Columns3 },
+    { label: "My Progress",      href: "/progress",         icon: BarChart2 },
     { label: "Outreach",         href: "/outreach",         icon: Mail },
     { label: "AI Copilot",       href: "/copilot",          icon: Brain,  badge: "AI" },
     { label: "Missions",         href: "/missions",         icon: Flame },

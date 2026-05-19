@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSessionFromCookies } from "@/app/lib/server/auth"
 import { getLeadById, updateLead, deleteLead } from "@/app/lib/server/leadStore"
-import { addAudit } from "@/app/lib/server/store"
+import { addAudit, getAllUsers } from "@/app/lib/server/store"
+import { sendUserNotification } from "@/app/lib/server/notify"
 import type { Lead } from "@/app/lib/data"
 
 type Params = { params: Promise<{ id: string }> }
@@ -69,6 +70,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     target_id:  id,
     detail:     `Updated ${lead.company}: ${Object.keys(safePatch).join(", ")}`,
   })
+
+  // Notify the newly assigned user (manual assignment)
+  if (
+    "assigned_to" in safePatch &&
+    safePatch.assigned_to &&
+    safePatch.assigned_to !== lead.assigned_to
+  ) {
+    const newAssigneeId = safePatch.assigned_to as string
+    // Don't await — fire and forget
+    getAllUsers()
+      .then(users => {
+        const assignee = users.find(u => u.id === newAssigneeId)
+        if (!assignee) return
+        return sendUserNotification(
+          newAssigneeId,
+          `New lead assigned to you`,
+          `${lead.company}${lead.poc_name ? ` — ${lead.poc_name}` : ""}`,
+          "/leads",
+          "info"
+        )
+      })
+      .catch(() => {})
+  }
 
   return NextResponse.json({ lead: updated })
 }

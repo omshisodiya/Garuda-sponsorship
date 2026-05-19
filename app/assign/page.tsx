@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Search, GitBranch, CheckSquare, Square, Loader, Shuffle, Filter } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Search, GitBranch, CheckSquare, Square, Loader, Shuffle, Filter, X as XIcon, Users } from "lucide-react"
 import type { Lead } from "../lib/data"
 
 // ── DisplayUser helpers ───────────────────────────────────────────────────────
@@ -60,6 +60,8 @@ export default function AssignPage() {
   const [unassignedOnly,  setUnassignedOnly]  = useState(false)
   const [intakePending,   setIntakePending]   = useState(0)
   const [leadView,        setLeadView]        = useState<"new" | "old">("new")
+  type DistResult = { userId: string; name: string; role: string; count: number; companies: string[] }
+  const [distResult,      setDistResult]      = useState<{ total: number; summary: DistResult[] } | null>(null)
 
   const LEGACY_CUTOFF = "2026-05-18"
 
@@ -134,50 +136,68 @@ export default function AssignPage() {
   }
 
   async function autoDistribute() {
-    const unassigned = leads.filter(l => l.assigned_to === null && !["confirmed","rejected"].includes(l.status) && (leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF))
-    if (unassigned.length === 0 || assignable.length === 0) return
+    const pool = assignable.filter(u => u.role !== "superadmin")
+    const toAssign = leads.filter(l =>
+      l.assigned_to === null &&
+      !["confirmed", "rejected"].includes(l.status) &&
+      (leadView === "new" ? l.created_at >= LEGACY_CUTOFF : l.created_at < LEGACY_CUTOFF)
+    )
+    if (toAssign.length === 0 || pool.length === 0) return
     setDistributing(true)
+    setDistResult(null)
 
-    // Priority order: team > admin > superadmin
+    // Priority: team > admin. Tie-break by current load.
     const byTier = (r: string) => r === "team" ? 0 : r === "admin" ? 1 : 2
-    const pool = [...assignable].sort((a, b) => byTier(a.role) - byTier(b.role))
-
-    // Current load per member
+    const sorted = [...pool].sort((a, b) => byTier(a.role) - byTier(b.role))
     const load: Record<string, number> = {}
-    pool.forEach(m => { load[m.id] = leads.filter(l => l.assigned_to === m.id).length })
+    sorted.forEach(m => { load[m.id] = leads.filter(l => l.assigned_to === m.id).length })
 
-    // Round-robin from least loaded, preferring team over admin over superadmin
-    const assignments: { id: string; assigned_to: string }[] = []
-    const updatedLoad = { ...load }
-
-    for (const lead of unassigned) {
-      const best = pool.reduce((prev, curr) => {
-        const pa = updatedLoad[prev.id] * 1 + byTier(prev.role) * 0.001
-        const ca = updatedLoad[curr.id] * 1 + byTier(curr.role) * 0.001
-        return ca < pa ? curr : prev
+    const assignments: { id: string; assigned_to: string; company: string }[] = []
+    const updLoad = { ...load }
+    for (const lead of toAssign) {
+      const best = sorted.reduce((p, c) => {
+        const pa = updLoad[p.id] + byTier(p.role) * 0.001
+        const ca = updLoad[c.id] + byTier(c.role) * 0.001
+        return ca < pa ? c : p
       })
-      assignments.push({ id: lead.id, assigned_to: best.id })
-      updatedLoad[best.id]++
+      assignments.push({ id: lead.id, assigned_to: best.id, company: lead.company })
+      updLoad[best.id]++
     }
 
     // Optimistic update
-    setLeads(prev =>
-      prev.map(l => {
-        const a = assignments.find(x => x.id === l.id)
-        return a ? { ...l, assigned_to: a.assigned_to } : l
-      })
-    )
+    setLeads(prev => prev.map(l => {
+      const a = assignments.find(x => x.id === l.id)
+      return a ? { ...l, assigned_to: a.assigned_to } : l
+    }))
 
     // Persist
     await Promise.all(
       assignments.map(({ id, assigned_to }) =>
         fetch(`/api/leads/${id}`, {
-          method:  "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ assigned_to }),
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assigned_to }),
         }).catch(() => {})
       )
     )
+
+    // Group by user → send notifications + show result banner
+    const byUser: Record<string, { name: string; role: string; companies: string[] }> = {}
+    for (const a of assignments) {
+      const m = sorted.find(u => u.id === a.assigned_to)
+      if (!m) continue
+      if (!byUser[a.assigned_to]) byUser[a.assigned_to] = { name: m.name, role: m.role, companies: [] }
+      byUser[a.assigned_to].companies.push(a.company)
+    }
+    const summary: DistResult[] = Object.entries(byUser).map(([userId, { name, role, companies }]) => ({ userId, name, role, count: companies.length, companies }))
+
+    if (summary.length > 0) {
+      setDistResult({ total: assignments.length, summary })
+      // Fire-and-forget server notification
+      fetch("/api/assign/notify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignments: summary }),
+      }).catch(() => {})
+    }
     setDistributing(false)
   }
 
@@ -259,6 +279,35 @@ export default function AssignPage() {
           )
         })}
       </div>
+
+      {/* Auto-distribute result banner */}
+      <AnimatePresence>
+        {distResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            style={{ marginBottom: 16, padding: "14px 18px", background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.22)", borderRadius: "var(--r-lg)", display: "flex", alignItems: "flex-start", gap: 12 }}
+          >
+            <Users size={16} color="#4ADE80" style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#4ADE80", marginBottom: 8 }}>
+                {distResult.total} lead{distResult.total !== 1 ? "s" : ""} distributed — notifications sent
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {distResult.summary.map(r => (
+                  <div key={r.userId} style={{ padding: "5px 12px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.18)", borderRadius: "var(--r-sm)", display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-1)" }}>{r.name.split(" ")[0]}</span>
+                    <span style={{ fontSize: 9, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{r.role}</span>
+                    <span style={{ fontSize: 12, fontWeight: 900, color: "#4ADE80", fontVariantNumeric: "tabular-nums" }}>+{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => setDistResult(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", display: "flex", flexShrink: 0 }}>
+              <XIcon size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Team Load — scrollable row */}
       <div style={{ overflowX: "auto", marginBottom: 18 }}>
